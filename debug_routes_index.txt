@@ -1,0 +1,62 @@
+import { Router } from 'express';
+import proveedorRoutes from './proveedor.routes';
+import serviciosOrdenRoutes from './servicios-orden.routes';
+import serviciosRoutes from './servicios.routes';
+import incidentesRoutes from './incidentes.routes';
+import facturasRoutes from './facturas.routes';
+import productosRoutes from './productos.routes';
+import clientesRoutes from './clientes.routes';
+import ordenesRoutes from './ordenes.routes';
+import vehiculosRoutes from './vehiculos.routes';
+import usuariosRoutes from './usuarios.routes';
+import comprasRoutes from './compras.routes';
+import alertasRoutes from './alertas.routes';
+import preciosChapisteriaRoutes from './precios-chapisteria.routes';
+import inventarioRoutes from './inventario.routes';
+import combosRoutes from './combos.routes';
+import colaboradoresRoutes from './colaboradores.routes';
+import myflotaRoutes from './myflota.routes';
+import cuentasPorCobrarRoutes from './cuentasPorCobrar.routes';
+import cuentasPorPagarRoutes from './cuentasPorPagar.routes';
+import { ProductosController } from '../controllers/productos.controller';
+
+const router = Router();
+
+router.get('/', (_req, res) => {
+  res.json({
+    estado: 'online',
+    sistema: 'Taller Automotriz API'
+  });
+});
+
+// Endpoint de categorías
+router.get('/categorias', async (_req, res) => {
+  try {
+    const result = await ProductosController.getAllCategorias();
+    res.status(result.success ? 200 : 500).json(result);
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: 'Error interno', error: error.message });
+  }
+});
+
+router.use('/proveedores', proveedorRoutes);
+router.use('/productos', productosRoutes);
+router.use('/servicios-orden', serviciosOrdenRoutes);
+router.use('/servicios', serviciosRoutes);
+router.use('/incidentes', incidentesRoutes);
+router.use('/facturas', facturasRoutes);
+router.use('/clientes', clientesRoutes);
+router.use('/ordenes', ordenesRoutes);
+router.use('/vehiculos', vehiculosRoutes);
+router.use('/usuarios', usuariosRoutes);
+router.use('/compras', comprasRoutes);
+router.use('/alertas', alertasRoutes);
+router.use('/precios-chapisteria', preciosChapisteriaRoutes);
+router.use('/inventario', inventarioRoutes);
+router.use('/combos', combosRoutes);
+router.use('/colaboradores', colaboradoresRoutes);
+router.use('/myflota', myflotaRoutes);
+router.use('/cuentas-por-cobrar', cuentasPorCobrarRoutes);
+router.use('/cuentas-por-pagar', cuentasPorPagarRoutes);
+
+export default router;

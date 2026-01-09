@@ -1,0 +1,10 @@
+{
+    "/api": {
+        "target": "https://logistictodo.com:55089",
+        "changeOrigin": true,
+        "pathRewrite": {
+            "^/api": ""
+        },
+        "secure": false
+    }
+}

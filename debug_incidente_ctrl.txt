@@ -1,0 +1,724 @@
+// ==========================================
+// CONTROLADOR DE INCIDENTES DE TRÁNSITO
+// ==========================================
+
+import { executeQuery } from '../config/database';
+import {
+  successResponse,
+  errorResponse,
+  serverErrorResponse,
+  handleSQLError,
+  getRequestBody,
+  validateRequiredFields,
+  validationErrorResponse
+} from '../utils/responses';
+
+// ==========================================
+// INTERFACES
+// ==========================================
+
+interface ParteVehiculo {
+  ParteID: number;
+  NombreParte: string;
+  CodigoParte: string;
+  Zona: string;
+  Descripcion?: string;
+  PrecioPromedioReparacion: number;
+}
+
+interface ParteDaniada {
+  parteId: number;
+  tipoDanio: string;
+  severidad: string;
+  descripcion?: string;
+  accion: string;
+  original?: boolean;
+  costoMano?: number;
+  costoPieza?: number;
+  productoId?: number;
+  productoNombre?: string;
+  cantidad?: number;
+}
+
+interface CrearOrdenIncidenteDTO {
+  vehiculoId: number;
+  clienteId: number;
+  tipoIncidente: string;
+  fechaIncidente: string;
+  lugarIncidente?: string;
+  descripcionIncidente?: string;
+  numeroPoliza?: string;
+  companiaSeguro?: string;
+  numeroSiniestro?: string;
+  contactoAseguradora?: string;
+  telefonoAseguradora?: string;
+  prioridad?: string;
+  fechaEntregaEstimada?: string;
+  partesDaniadas: ParteDaniada[];
+  creadoPor: string;
+}
+
+// ==========================================
+// GET /api/incidentes/catalogo-partes
+// Obtener catálogo completo de partes del vehículo
+// ==========================================
+export async function obtenerCatalogoPartes(req: Request): Promise<Response> {
+  try {
+    const url = new URL(req.url, 'http://localhost');
+    const zona = url.searchParams.get('zona');
+
+    let query = `
+      SELECT
+        ParteID,
+        NombreParte,
+        CodigoParte,
+        Zona,
+        Descripcion,
+        PrecioPromedioReparacion,
+        Estado
+      FROM CatalogoPartesVehiculo
+      WHERE Estado = 1
+    `;
+
+    if (zona) {
+      query += ` AND Zona = '${zona}'`;
+    }
+
+    query += ` ORDER BY Zona, NombreParte`;
+
+    const result = await executeQuery(query);
+
+    // Agrupar por zona
+    const partesPorZona: any = {};
+    result.recordset.forEach((parte: any) => {
+      if (!partesPorZona[parte.Zona]) {
+        partesPorZona[parte.Zona] = [];
+      }
+      partesPorZona[parte.Zona].push(parte);
+    });
+
+    return successResponse({
+      partes: result.recordset,
+      partesPorZona,
+      total: result.recordset.length
+    }, 'Catálogo de partes obtenido exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al obtener catálogo de partes:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// POST /api/incidentes
+// Crear nueva orden de incidente
+// ==========================================
+export async function crearOrdenIncidente(req: Request): Promise<Response> {
+  console.log('🔵 crearOrdenIncidente: Iniciando...');
+  try {
+    const body: CrearOrdenIncidenteDTO = await getRequestBody(req);
+    console.log('🔵 Body recibido:', JSON.stringify(body).substring(0, 200));
+
+    // Validar campos requeridos
+    const camposRequeridos = ['vehiculoId', 'clienteId', 'tipoIncidente', 'fechaIncidente', 'partesDaniadas', 'creadoPor'];
+    console.log('🔵 Campos recibidos:', { vehiculoId: body.vehiculoId, clienteId: body.clienteId, tipoIncidente: body.tipoIncidente, fechaIncidente: body.fechaIncidente, partesDaniadasLength: Array.isArray(body.partesDaniadas) ? body.partesDaniadas.length : 'not array', creadoPor: body.creadoPor });
+    const erroresValidacion = validateRequiredFields(body, camposRequeridos);
+    if (erroresValidacion.length > 0) {
+      console.log('🔴 Validación fallida:', erroresValidacion);
+      return validationErrorResponse(erroresValidacion);
+    }
+
+    if (!Array.isArray(body.partesDaniadas) || body.partesDaniadas.length === 0) {
+      console.log('🔴 Partes dañadas inválidas');
+      return errorResponse('Debe especificar al menos una parte dañada', undefined, 400);
+    }
+
+    // Formatear fechas para SQL Server (agregar :00 para segundos si no están presentes)
+    const formatFechaSQL = (fecha: string): string => {
+      // Si la fecha tiene formato YYYY-MM-DDTHH:mm, agregar :00 para segundos
+      if (fecha.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+        return fecha + ':00';
+      }
+      return fecha;
+    };
+
+    const fechaIncidenteSQL = formatFechaSQL(body.fechaIncidente);
+    const fechaEntregaSQL = body.fechaEntregaEstimada ? formatFechaSQL(body.fechaEntregaEstimada) : null;
+
+    // Ejecutar stored procedure
+    const query = `
+      EXEC sp_CrearOrdenIncidente
+        @VehiculoID = ${body.vehiculoId},
+        @ClienteID = ${body.clienteId},
+        @MecanicoAsignadoID = ${body.mecanicoAsignadoId ? body.mecanicoAsignadoId : 'NULL'},
+        @TipoIncidente = '${body.tipoIncidente}',
+        @FechaIncidente = '${fechaIncidenteSQL}',
+        @LugarIncidente = ${body.lugarIncidente ? `'${body.lugarIncidente.replace(/'/g, "''")}'` : 'NULL'},
+        @DescripcionIncidente = ${body.descripcionIncidente ? `'${body.descripcionIncidente.replace(/'/g, "''")}'` : 'NULL'},
+        @NumeroPoliza = ${body.numeroPoliza ? `'${body.numeroPoliza}'` : 'NULL'},
+        @CompaniaSeguro = ${body.companiaSeguro ? `'${body.companiaSeguro.replace(/'/g, "''")}'` : 'NULL'},
+        @NumeroSiniestro = ${body.numeroSiniestro ? `'${body.numeroSiniestro}'` : 'NULL'},
+        @ContactoAseguradora = ${body.contactoAseguradora ? `'${body.contactoAseguradora.replace(/'/g, "''")}'` : 'NULL'},
+        @TelefonoAseguradora = ${body.telefonoAseguradora ? `'${body.telefonoAseguradora}'` : 'NULL'},
+        @Prioridad = '${body.prioridad || 'normal'}',
+        @FechaEntregaEstimada = ${fechaEntregaSQL ? `'${fechaEntregaSQL}'` : 'NULL'},
+        @PartesDaniadas = '${JSON.stringify(body.partesDaniadas).replace(/'/g, "''")}',
+        @CreadoPor = '${body.creadoPor}'
+    `;
+
+    console.log('🔵 Ejecutando query...');
+    const result = await executeQuery(query);
+    console.log('🟢 Query ejecutado. Registros:', result.recordset?.length);
+
+    if (result.recordset && result.recordset.length > 0) {
+      console.log('🟢 Retornando success response');
+      return successResponse(result.recordset[0], 'Orden de incidente creada exitosamente');
+    }
+
+    console.log('🟡 No hay resultados, retornando error');
+    return errorResponse('No se pudo crear la orden de incidente');
+
+  } catch (error: any) {
+    console.error('🔴 Error al crear orden de incidente:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// GET /api/incidentes
+// Listar órdenes de incidente
+// ==========================================
+export async function listarOrdenesIncidente(req: Request): Promise<Response> {
+  try {
+    const url = new URL(req.url, 'http://localhost');
+    const estado = url.searchParams.get('estado');
+    const fechaDesde = url.searchParams.get('fechaDesde');
+    const fechaHasta = url.searchParams.get('fechaHasta');
+    const busqueda = url.searchParams.get('busqueda');
+
+    const query = `
+      EXEC sp_ListarOrdenesIncidente
+        @Estado = ${estado ? `'${estado}'` : 'NULL'},
+        @FechaDesde = ${fechaDesde ? `'${fechaDesde}'` : 'NULL'},
+        @FechaHasta = ${fechaHasta ? `'${fechaHasta}'` : 'NULL'},
+        @Busqueda = ${busqueda ? `'${busqueda}'` : 'NULL'}
+    `;
+
+    const result = await executeQuery(query);
+
+    return successResponse({
+      ordenes: result.recordset,
+      total: result.recordset.length
+    }, 'Órdenes de incidente obtenidas exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al listar órdenes de incidente:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// GET /api/incidentes/:id
+// Obtener detalle de orden de incidente
+// ==========================================
+export async function obtenerDetalleIncidente(req: Request, id: number): Promise<Response> {
+  try {
+    const query = `EXEC sp_ObtenerDetalleIncidente @OrdenIncidenteID = ${id}`;
+    const result = await executeQuery(query);
+
+    if (result.recordsets.length >= 2) {
+      const orden = result.recordsets[0][0];
+      const partesDaniadas = result.recordsets[1];
+
+      if (!orden) {
+        return errorResponse('Orden de incidente no encontrada', undefined, 404);
+      }
+
+      return successResponse({
+        orden,
+        partesDaniadas,
+        totalPartes: partesDaniadas.length
+      }, 'Detalle de incidente obtenido exitosamente');
+    }
+
+    return errorResponse('No se pudo obtener el detalle del incidente');
+
+  } catch (error: any) {
+    console.error('Error al obtener detalle de incidente:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// PUT /api/incidentes/:id/estado
+// Actualizar estado de orden de incidente
+// ==========================================
+export async function actualizarEstadoIncidente(req: Request, id: number): Promise<Response> {
+  try {
+    const body = await getRequestBody(req);
+    const { estado, observaciones, modificadoPor } = body;
+
+    if (!estado || !modificadoPor) {
+      return errorResponse('Estado y modificadoPor son requeridos', undefined, 400);
+    }
+
+    const estadosValidos = ['pendiente', 'en_evaluacion', 'aprobado', 'en_reparacion', 'completado', 'cancelado'];
+    if (!estadosValidos.includes(estado)) {
+      return errorResponse('Estado no válido', undefined, 400);
+    }
+
+    const query = `
+      UPDATE OrdenesIncidente
+      SET
+        Estado = '${estado}',
+        ${observaciones ? `ObservacionesReparacion = '${observaciones.replace(/'/g, "''")}',` : ''}
+        ModificadoPor = '${modificadoPor}',
+        FechaModificacion = GETDATE()
+        ${estado === 'en_evaluacion' ? ', FechaEvaluacion = GETDATE()' : ''}
+        ${estado === 'aprobado' ? ', FechaAprobacion = GETDATE()' : ''}
+        ${estado === 'en_reparacion' ? ', FechaInicioReparacion = GETDATE()' : ''}
+        ${estado === 'completado' ? ', FechaFinReparacion = GETDATE()' : ''}
+      WHERE OrdenIncidenteID = ${id}
+    `;
+
+    await executeQuery(query);
+
+    return successResponse(null, 'Estado de incidente actualizado exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al actualizar estado de incidente:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// GET /api/incidentes/estadisticas
+// Obtener estadísticas de incidentes
+// ==========================================
+export async function obtenerEstadisticasIncidentes(req: Request): Promise<Response> {
+  try {
+    const query = `
+      SELECT
+        COUNT(*) as TotalIncidentes,
+        COUNT(CASE WHEN Estado = 'pendiente' THEN 1 END) as Pendientes,
+        COUNT(CASE WHEN Estado = 'en_evaluacion' THEN 1 END) as EnEvaluacion,
+        COUNT(CASE WHEN Estado = 'aprobado' THEN 1 END) as Aprobados,
+        COUNT(CASE WHEN Estado = 'en_reparacion' THEN 1 END) as EnReparacion,
+        COUNT(CASE WHEN Estado = 'completado' THEN 1 END) as Completados,
+        COUNT(CASE WHEN Estado = 'cancelado' THEN 1 END) as Cancelados,
+        SUM(MontoEstimado) as MontoEstimadoTotal,
+        SUM(MontoAprobado) as MontoAprobadoTotal,
+        SUM(MontoFinal) as MontoFinalTotal,
+        AVG(MontoEstimado) as MontoEstimadoPromedio
+      FROM OrdenesIncidente;
+
+      -- Incidentes por tipo
+      SELECT
+        TipoIncidente,
+        COUNT(*) as Total,
+        SUM(MontoEstimado) as MontoTotal
+      FROM OrdenesIncidente
+      GROUP BY TipoIncidente
+      ORDER BY Total DESC;
+
+      -- Partes más dañadas
+      SELECT TOP 10
+        cp.NombreParte,
+        cp.Zona,
+        COUNT(*) as VecesDaniada,
+        AVG(pd.CostoTotal) as CostoPromedio
+      FROM PartesVehiculoDaniadas pd
+      INNER JOIN CatalogoPartesVehiculo cp ON pd.ParteID = cp.ParteID
+      GROUP BY cp.NombreParte, cp.Zona
+      ORDER BY VecesDaniada DESC;
+    `;
+
+    const result = await executeQuery(query);
+
+    return successResponse({
+      general: result.recordsets[0][0],
+      porTipo: result.recordsets[1],
+      partesMasDaniadas: result.recordsets[2]
+    }, 'Estadísticas de incidentes obtenidas exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al obtener estadísticas de incidentes:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// PUT /api/incidentes/:id/completar
+// Completar orden de incidente y descontar stock
+// ==========================================
+export async function completarOrdenIncidente(req: Request, id: number): Promise<Response> {
+  try {
+    const body = await getRequestBody(req);
+    const { modificadoPor } = body;
+
+    if (!modificadoPor) {
+      return errorResponse('ModificadoPor es requerido', undefined, 400);
+    }
+
+    const query = `
+      EXEC sp_CompletarOrdenIncidente
+        @OrdenIncidenteID = ${id},
+        @ModificadoPor = '${modificadoPor}'
+    `;
+
+    const result = await executeQuery(query);
+
+    if (result.recordset && result.recordset.length > 0) {
+      return successResponse(result.recordset[0], 'Orden completada y stock actualizado exitosamente');
+    }
+
+    return successResponse(null, 'Orden completada exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al completar orden de incidente:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// PUT /api/incidentes/:id/cancelar
+// Cancelar orden de incidente y devolver stock si fue completada
+// ==========================================
+export async function cancelarOrdenIncidente(req: Request, id: number): Promise<Response> {
+  try {
+    const body = await getRequestBody(req);
+    const { motivo, modificadoPor } = body;
+
+    if (!motivo || !modificadoPor) {
+      return errorResponse('Motivo y modificadoPor son requeridos', undefined, 400);
+    }
+
+    const query = `
+      EXEC sp_CancelarOrdenIncidente
+        @OrdenIncidenteID = ${id},
+        @Motivo = '${motivo.replace(/'/g, "''")}',
+        @ModificadoPor = '${modificadoPor}'
+    `;
+
+    const result = await executeQuery(query);
+
+    if (result.recordset && result.recordset.length > 0) {
+      return successResponse(result.recordset[0], 'Orden cancelada exitosamente');
+    }
+
+    return successResponse(null, 'Orden cancelada exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al cancelar orden de incidente:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// PUT /api/incidentes/:id
+// Actualizar información general de un incidente
+// ==========================================
+export async function actualizarOrdenIncidente(req: Request, id: number): Promise<Response> {
+  try {
+    const body = await getRequestBody(req);
+
+    console.log('📝 Actualizando orden de incidente:', id);
+    console.log('📦 Datos recibidos:', body);
+
+    // Formatear fechas si vienen en el body
+    const formatFechaSQL = (fecha: string): string => {
+      if (!fecha) return fecha;
+      if (fecha.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+        return fecha + ':00';
+      }
+      return fecha;
+    };
+
+    const query = `
+      EXEC sp_ActualizarOrdenIncidente
+        @OrdenIncidenteID = ${id},
+        @MecanicoAsignadoID = ${body.mecanicoAsignadoId ? body.mecanicoAsignadoId : 'NULL'},
+        @TipoIncidente = ${body.tipoIncidente ? `'${body.tipoIncidente}'` : 'NULL'},
+        @FechaIncidente = ${body.fechaIncidente ? `'${formatFechaSQL(body.fechaIncidente)}'` : 'NULL'},
+        @LugarIncidente = ${body.lugarIncidente ? `'${body.lugarIncidente.replace(/'/g, "''")}'` : 'NULL'},
+        @DescripcionIncidente = ${body.descripcionIncidente ? `'${body.descripcionIncidente.replace(/'/g, "''")}'` : 'NULL'},
+        @NumeroPoliza = ${body.numeroPoliza ? `'${body.numeroPoliza}'` : 'NULL'},
+        @CompaniaSeguro = ${body.companiaSeguro ? `'${body.companiaSeguro.replace(/'/g, "''")}'` : 'NULL'},
+        @NumeroSiniestro = ${body.numeroSiniestro ? `'${body.numeroSiniestro}'` : 'NULL'},
+        @ContactoAseguradora = ${body.contactoAseguradora ? `'${body.contactoAseguradora.replace(/'/g, "''")}'` : 'NULL'},
+        @TelefonoAseguradora = ${body.telefonoAseguradora ? `'${body.telefonoAseguradora}'` : 'NULL'},
+        @Prioridad = ${body.prioridad ? `'${body.prioridad}'` : 'NULL'},
+        @FechaEntregaEstimada = ${body.fechaEntregaEstimada ? `'${formatFechaSQL(body.fechaEntregaEstimada)}'` : 'NULL'},
+        @ObservacionesEvaluacion = ${body.observacionesEvaluacion ? `'${body.observacionesEvaluacion.replace(/'/g, "''")}'` : 'NULL'},
+        @ObservacionesReparacion = ${body.observacionesReparacion ? `'${body.observacionesReparacion.replace(/'/g, "''")}'` : 'NULL'},
+        @ModificadoPor = '${body.modificadoPor || 'Sistema'}'
+    `;
+
+    const result = await executeQuery(query);
+
+    if (result.recordset && result.recordset.length > 0) {
+      return successResponse(result.recordset[0], 'Orden actualizada exitosamente');
+    }
+
+    return successResponse(null, 'Orden actualizada exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al actualizar orden de incidente:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// POST /api/incidentes/:id/partes
+// Agregar parte dañada a un incidente
+// ==========================================
+export async function agregarParteDaniada(req: Request, id: number): Promise<Response> {
+  try {
+    const body = await getRequestBody(req);
+
+    const camposRequeridos = [
+      'parteId',
+      'tipoDanio',
+      'severidad',
+      'accion',
+      'costoMano',
+      'costoPieza'
+    ];
+
+    const erroresValidacion = validateRequiredFields(body, camposRequeridos);
+    if (erroresValidacion.length > 0) {
+      return validationErrorResponse(erroresValidacion);
+    }
+
+    console.log('➕ Agregando parte dañada al incidente:', id);
+
+    const query = `
+      EXEC sp_AgregarParteDaniada
+        @OrdenIncidenteID = ${id},
+        @ParteID = ${body.parteId},
+        @TipoDanio = '${body.tipoDanio}',
+        @SeveridadDanio = '${body.severidad}',
+        @DescripcionDanio = ${body.descripcion ? `'${body.descripcion.replace(/'/g, "''")}'` : 'NULL'},
+        @AccionRequerida = '${body.accion}',
+        @PiezaOriginal = ${body.original ? 1 : 0},
+        @CostoManoObra = ${body.costoMano},
+        @CostoPieza = ${body.costoPieza},
+        @ProductoID = ${body.productoId || 'NULL'},
+        @Cantidad = ${body.cantidad || 'NULL'},
+        @RegistradoPor = '${body.registradoPor || 'Sistema'}'
+    `;
+
+    const result = await executeQuery(query);
+
+    if (result.recordset && result.recordset.length > 0) {
+      return successResponse(result.recordset[0], 'Parte dañada agregada exitosamente');
+    }
+
+    return successResponse(null, 'Parte dañada agregada exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al agregar parte dañada:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// PUT /api/incidentes/:id/partes/:parteId
+// Actualizar parte dañada
+// ==========================================
+export async function actualizarParteDaniada(req: Request, parteId: number): Promise<Response> {
+  try {
+    const body = await getRequestBody(req);
+
+    console.log('✏️ Actualizando parte dañada:', parteId);
+
+    const query = `
+      EXEC sp_ActualizarParteDaniada
+        @ParteDaniadaID = ${parteId},
+        @TipoDanio = ${body.tipoDanio ? `'${body.tipoDanio}'` : 'NULL'},
+        @SeveridadDanio = ${body.severidad ? `'${body.severidad}'` : 'NULL'},
+        @DescripcionDanio = ${body.descripcion ? `'${body.descripcion.replace(/'/g, "''")}'` : 'NULL'},
+        @AccionRequerida = ${body.accion ? `'${body.accion}'` : 'NULL'},
+        @PiezaOriginal = ${body.original !== undefined ? (body.original ? 1 : 0) : 'NULL'},
+        @CostoManoObra = ${body.costoMano !== undefined ? body.costoMano : 'NULL'},
+        @CostoPieza = ${body.costoPieza !== undefined ? body.costoPieza : 'NULL'},
+        @ProductoID = ${body.productoId !== undefined ? (body.productoId || 0) : 'NULL'},
+        @Cantidad = ${body.cantidad !== undefined ? body.cantidad : 'NULL'}
+    `;
+
+    const result = await executeQuery(query);
+
+    if (result.recordset && result.recordset.length > 0) {
+      return successResponse(result.recordset[0], 'Parte dañada actualizada exitosamente');
+    }
+
+    return successResponse(null, 'Parte dañada actualizada exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al actualizar parte dañada:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// DELETE /api/incidentes/:id/partes/:parteId
+// Eliminar parte dañada
+// ==========================================
+export async function eliminarParteDaniada(req: Request, parteId: number): Promise<Response> {
+  try {
+    console.log('🗑️ Eliminando parte dañada:', parteId);
+
+    const query = `
+      EXEC sp_EliminarParteDaniada
+        @ParteDaniadaID = ${parteId}
+    `;
+
+    await executeQuery(query);
+
+    return successResponse(null, 'Parte dañada eliminada exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al eliminar parte dañada:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// POST /api/incidentes/:id/productos
+// Agregar producto adicional a un incidente
+// ==========================================
+export async function agregarProductoAIncidente(req: Request, id: number): Promise<Response> {
+  try {
+    const body = await getRequestBody(req);
+
+    const camposRequeridos = ['productoId', 'cantidad'];
+
+    const erroresValidacion = validateRequiredFields(body, camposRequeridos);
+    if (erroresValidacion.length > 0) {
+      return validationErrorResponse(erroresValidacion);
+    }
+
+    console.log('➕ Agregando producto al incidente:', id);
+
+    const query = `
+      EXEC sp_AgregarProductoAIncidente
+        @OrdenIncidenteID = ${id},
+        @ProductoID = ${body.productoId},
+        @Cantidad = ${body.cantidad},
+        @AgregadoPor = '${body.agregadoPor || 'Sistema'}'
+    `;
+
+    const result = await executeQuery(query);
+
+    if (result.recordset && result.recordset.length > 0) {
+      return successResponse(result.recordset[0], 'Producto agregado exitosamente');
+    }
+
+    return successResponse(null, 'Producto agregado exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al agregar producto:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// PUT /api/incidentes/:id/productos/:productoIncidenteId
+// Actualizar cantidad de producto en incidente
+// ==========================================
+export async function actualizarProductoIncidente(req: Request, productoIncidenteId: number): Promise<Response> {
+  try {
+    const body = await getRequestBody(req);
+
+    const camposRequeridos = ['cantidad'];
+
+    const erroresValidacion = validateRequiredFields(body, camposRequeridos);
+    if (erroresValidacion.length > 0) {
+      return validationErrorResponse(erroresValidacion);
+    }
+
+    console.log('✏️ Actualizando producto en incidente:', productoIncidenteId);
+
+    const query = `
+      EXEC sp_ActualizarProductoIncidente
+        @ProductoIncidenteID = ${productoIncidenteId},
+        @Cantidad = ${body.cantidad}
+    `;
+
+    const result = await executeQuery(query);
+
+    if (result.recordset && result.recordset.length > 0) {
+      return successResponse(result.recordset[0], 'Producto actualizado exitosamente');
+    }
+
+    return successResponse(null, 'Producto actualizado exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al actualizar producto:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// DELETE /api/incidentes/:id/productos/:productoIncidenteId
+// Eliminar producto de incidente
+// ==========================================
+export async function eliminarProductoIncidente(req: Request, productoIncidenteId: number): Promise<Response> {
+  try {
+    console.log('🗑️ Eliminando producto del incidente:', productoIncidenteId);
+
+    const query = `
+      EXEC sp_EliminarProductoIncidente
+        @ProductoIncidenteID = ${productoIncidenteId}
+    `;
+
+    await executeQuery(query);
+
+    return successResponse(null, 'Producto eliminado exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al eliminar producto:', error);
+    return handleSQLError(error);
+  }
+}
+
+// ==========================================
+// POST /api/incidentes/:id/facturar
+// Generar factura desde un incidente
+// ==========================================
+export async function generarFacturaIncidente(req: Request, id: number): Promise<Response> {
+  try {
+    const body = await getRequestBody(req);
+
+    const camposRequeridos = ['usuarioId'];
+
+    const erroresValidacion = validateRequiredFields(body, camposRequeridos);
+    if (erroresValidacion.length > 0) {
+      return validationErrorResponse(erroresValidacion);
+    }
+
+    console.log('📄 Generando factura para incidente:', id);
+
+    const query = `
+      DECLARE @FacturaID INT;
+
+      EXEC sp_GenerarFacturaIncidente
+        @OrdenIncidenteID = ${id},
+        @UsuarioID = ${body.usuarioId};
+
+      SELECT @FacturaID AS FacturaID;
+    `;
+
+    const result = await executeQuery(query);
+
+    if (result.recordset && result.recordset.length > 0) {
+      return successResponse(result.recordset[0], 'Factura generada exitosamente');
+    }
+
+    return successResponse(null, 'Factura generada exitosamente');
+
+  } catch (error: any) {
+    console.error('Error al generar factura:', error);
+    return handleSQLError(error);
+  }
+}

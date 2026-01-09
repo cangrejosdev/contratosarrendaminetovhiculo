@@ -1,0 +1,1049 @@
+import { executeStoredProcedure, executeQuery, sql } from '../config/database';
+import type {
+  CrearOrdenServicioDTO,
+  ActualizarEstadoOrdenDTO,
+  EstadoOrden,
+} from '../types';
+import {
+  ESTADOS_ORDEN
+} from '../types';
+import {
+  successResponse,
+  errorResponse,
+  handleSQLError,
+  getRequestBody,
+  validateRequiredFields,
+  validationErrorResponse,
+} from '../utils/responses';
+
+/**
+ * Obtener todas las órdenes activas
+ * GET /api/ordenes
+ */
+export async function obtenerOrdenesActivas(req: Request): Promise<Response> {
+  try {
+    const url = new URL(req.url, 'http://localhost');
+    const estadoFiltro = url.searchParams.get('estado');
+    const mecanicoID = url.searchParams.get('mecanicoID');
+
+    const result = await executeStoredProcedure('SP_ObtenerOrdenesActivas', {
+      EstadoFiltro: estadoFiltro,
+      MecanicoID: mecanicoID ? parseInt(mecanicoID) : null,
+    });
+
+    return successResponse(result.recordset, 'Órdenes obtenidas exitosamente');
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Obtener detalle de una orden específica
+ * GET /api/ordenes/:id
+ */
+export async function obtenerDetalleOrden(
+  _req: Request,
+  ordenID: number
+): Promise<Response> {
+  try {
+    // Consulta para obtener orden - CON PARÁMETROS (no SQL injection)
+    const queryOrden = `
+      SELECT
+        OS.*,
+        V.Placa, V.Marca, V.Modelo, V.Anio,
+        C.NombreCompleto AS NombreCliente, C.Telefono AS TelefonoCliente,
+        M.NombreCompleto AS NombreMecanico
+      FROM OrdenesServicio OS
+      INNER JOIN Vehiculos V ON OS.VehiculoID = V.VehiculoID
+      INNER JOIN Clientes C ON OS.ClienteID = C.ClienteID
+      LEFT JOIN Mecanicos M ON OS.MecanicoAsignadoID = M.MecanicoID
+      WHERE OS.OrdenServicioID = @ordenID
+    `;
+
+    const resultOrden = await executeQuery(queryOrden, [
+      { name: 'ordenID', type: 'Int', value: ordenID }
+    ]);
+
+    if (resultOrden.recordset.length === 0) {
+      return errorResponse('Orden no encontrada', undefined, 404);
+    }
+
+    // Consulta para obtener servicios - CON PARÁMETROS
+    const queryServicios = `
+      SELECT
+        DOS.*,
+        TS.NombreServicio, TS.Categoria
+      FROM DetalleOrdenServicio DOS
+      INNER JOIN TiposServicio TS ON DOS.TipoServicioID = TS.TipoServicioID
+      WHERE DOS.OrdenServicioID = @ordenID
+    `;
+
+    const resultServicios = await executeQuery(queryServicios, [
+      { name: 'ordenID', type: 'Int', value: ordenID }
+    ]);
+
+    // Consulta para obtener repuestos - CON PARÁMETROS
+    const queryRepuestos = `
+      SELECT
+        ROS.*,
+        P.CodigoProducto, P.NombreProducto
+      FROM RepuestosOrdenServicio ROS
+      INNER JOIN Productos P ON ROS.ProductoID = P.ProductoID
+      WHERE ROS.OrdenServicioID = @ordenID
+    `;
+
+    const resultRepuestos = await executeQuery(queryRepuestos, [
+      { name: 'ordenID', type: 'Int', value: ordenID }
+    ]);
+
+    // Consulta para obtener servicios externos - CON PARÁMETROS
+    const queryExternos = `
+      SELECT
+        OSE.*,
+        TE.NombreTaller
+      FROM OrdenesServicioExterno OSE
+      INNER JOIN TalleresExternos TE ON OSE.TallerExternoID = TE.TallerExternoID
+      WHERE OSE.OrdenServicioID = @ordenID
+    `;
+
+    const resultExternos = await executeQuery(queryExternos, [
+      { name: 'ordenID', type: 'Int', value: ordenID }
+    ]);
+
+    const detalleCompleto = {
+      orden: resultOrden.recordset[0],
+      servicios: resultServicios.recordset,
+      repuestos: resultRepuestos.recordset,
+      serviciosExternos: resultExternos.recordset,
+    };
+
+    return successResponse(detalleCompleto, 'Detalle de orden obtenido exitosamente');
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Crear orden de servicio simple (sin servicios)
+ * POST /api/ordenes (sin detalleServicios)
+ */
+export async function crearOrdenSimple(req: Request): Promise<Response> {
+  try {
+    const body = await getRequestBody<{
+      VehiculoID: number;
+      ClienteID: number;
+      KilometrajeIngreso: number;
+      MotivoIngreso: string;
+      Observaciones?: string;
+      MecanicoAsignadoID?: number;
+      FechaSalidaEstimada?: string;
+    }>(req);
+
+    if (!body) {
+      return errorResponse('Cuerpo de la petición inválido');
+    }
+
+    // UsuarioID por defecto si no se proporciona (temporalmente hasta implementar autenticación)
+    const usuarioID = body.UsuarioID || 1;
+
+    // Validar campos requeridos
+    const errors = validateRequiredFields(body, [
+      'VehiculoID',
+      'ClienteID',
+      'KilometrajeIngreso',
+      'MotivoIngreso',
+    ]);
+
+    if (errors.length > 0) {
+      return validationErrorResponse(errors);
+    }
+
+    // Validar que el vehículo existe
+    const queryVehiculo = `
+      SELECT VehiculoID
+      FROM Vehiculos
+      WHERE VehiculoID = @vehiculoID AND Estado = 1
+    `;
+    const resultVehiculo = await executeQuery(queryVehiculo, [
+      { name: 'vehiculoID', type: 'Int', value: body.VehiculoID }
+    ]);
+
+    if (resultVehiculo.recordset.length === 0) {
+      return errorResponse('Vehículo no encontrado o inactivo', undefined, 400);
+    }
+
+    // Validar que el cliente existe
+    const queryCliente = `
+      SELECT ClienteID
+      FROM Clientes
+      WHERE ClienteID = @clienteID AND Estado = 1
+    `;
+    const resultCliente = await executeQuery(queryCliente, [
+      { name: 'clienteID', type: 'Int', value: body.ClienteID }
+    ]);
+
+    if (resultCliente.recordset.length === 0) {
+      return errorResponse('Cliente no encontrado o inactivo', undefined, 400);
+    }
+
+    // Generar número de orden automáticamente
+    const queryMaxOrden = `
+      SELECT ISNULL(MAX(CAST(SUBSTRING(NumeroOrden, 4, LEN(NumeroOrden)) AS INT)), 0) + 1 AS NextNumber
+      FROM OrdenesServicio
+      WHERE NumeroOrden LIKE 'OS-%'
+    `;
+    const resultMaxOrden = await executeQuery(queryMaxOrden, []);
+    const nextNumber = resultMaxOrden.recordset[0].NextNumber;
+    const numeroOrden = `OS-${nextNumber.toString().padStart(6, '0')}`;
+
+    // Crear la orden
+    const queryInsert = `
+      INSERT INTO OrdenesServicio (
+        NumeroOrden,
+        VehiculoID,
+        ClienteID,
+        MecanicoAsignadoID,
+        FechaIngreso,
+        FechaSalidaEstimada,
+        KilometrajeIngreso,
+        MotivoIngreso,
+        EstadoOrden,
+        CostoManoObra,
+        CostoRepuestos,
+        CostoTotal,
+        Observaciones,
+        Estado
+      )
+      OUTPUT INSERTED.OrdenServicioID
+      VALUES (
+        @numeroOrden,
+        @vehiculoID,
+        @clienteID,
+        @mecanicoID,
+        GETDATE(),
+        @fechaSalidaEstimada,
+        @kilometrajeIngreso,
+        @motivoIngreso,
+        'Pendiente',
+        0,
+        0,
+        0,
+        @observaciones,
+        1
+      )
+    `;
+
+    const params = [
+      { name: 'numeroOrden', type: 'NVarChar', value: numeroOrden },
+      { name: 'vehiculoID', type: 'Int', value: body.VehiculoID },
+      { name: 'clienteID', type: 'Int', value: body.ClienteID },
+      { name: 'mecanicoID', type: 'Int', value: body.MecanicoAsignadoID || null },
+      { name: 'fechaSalidaEstimada', type: 'DateTime', value: body.FechaSalidaEstimada || null },
+      { name: 'kilometrajeIngreso', type: 'Int', value: body.KilometrajeIngreso },
+      { name: 'motivoIngreso', type: 'NVarChar', value: body.MotivoIngreso },
+      { name: 'observaciones', type: 'NVarChar', value: body.Observaciones || null }
+    ];
+
+    const result = await executeQuery(queryInsert, params);
+    const ordenServicioID = result.recordset[0].OrdenServicioID;
+
+    return successResponse(
+      {
+        ordenServicioID,
+        numeroOrden,
+        mensaje: 'Orden creada exitosamente'
+      },
+      'Orden de servicio registrada exitosamente',
+      201
+    );
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Crear nueva orden de servicio completa (con servicios)
+ * POST /api/ordenes (con detalleServicios)
+ */
+export async function crearOrdenServicio(req: Request): Promise<Response> {
+  try {
+    const body = await getRequestBody<CrearOrdenServicioDTO>(req);
+
+    console.log('===== DEBUG: Crear Orden Servicio =====');
+    console.log('Body recibido:', JSON.stringify(body, null, 2));
+
+    if (!body) {
+      return errorResponse('Cuerpo de la petición inválido');
+    }
+
+    // Validar campos requeridos
+    const errors = validateRequiredFields(body, [
+      'numeroOrden',
+      'vehiculoID',
+      'clienteID',
+      'kilometrajeIngreso',
+      'motivoIngreso',
+      'detalleServicios',
+    ]);
+
+    console.log('Errores de validación:', errors);
+
+    if (errors.length > 0) {
+      return validationErrorResponse(errors);
+    }
+
+    // Validar que haya al menos un servicio
+    if (!body.detalleServicios || body.detalleServicios.length === 0) {
+      return errorResponse('Debe agregar al menos un servicio');
+    }
+
+    // Preparar JSON de servicios
+    const serviciosJSON = JSON.stringify(
+      body.detalleServicios.map((s) => ({
+        TipoServicioID: s.tipoServicioID,
+        Cantidad: s.cantidad,
+        PrecioUnitario: s.precioUnitario,
+      }))
+    );
+
+    // Preparar JSON de repuestos si existen
+    let repuestosJSON = null;
+    if (body.detalleRepuestos && body.detalleRepuestos.length > 0) {
+      repuestosJSON = JSON.stringify(
+        body.detalleRepuestos.map((r) => ({
+          ProductoID: r.productoID,
+          Cantidad: r.cantidad,
+          PrecioUnitario: r.precioUnitario,
+        }))
+      );
+    }
+
+    // Ejecutar SP
+    const result = await executeStoredProcedure(
+      'SP_RegistrarOrdenServicio',
+      {
+        NumeroOrden: body.numeroOrden,
+        VehiculoID: body.vehiculoID,
+        ClienteID: body.clienteID,
+        MecanicoAsignadoID: body.mecanicoAsignadoID || null,
+        KilometrajeIngreso: body.kilometrajeIngreso,
+        MotivoIngreso: body.motivoIngreso,
+        Prioridad: body.prioridad || 'Normal',
+        FechaSalidaEstimada: body.fechaSalidaEstimada || null,
+        DetalleServicios: serviciosJSON,
+        DetalleRepuestos: repuestosJSON,
+        UsuarioID: 1,
+      },
+      {
+        OrdenServicioID: sql.Int(),
+      }
+    );
+
+    return successResponse(
+      {
+        ordenServicioID: result.output.OrdenServicioID,
+        mensaje: result.recordset[0]?.Mensaje || 'Orden creada exitosamente',
+      },
+      'Orden de servicio registrada exitosamente',
+      201
+    );
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Actualizar estado de orden
+ * PUT /api/ordenes/:id/estado
+ */
+export async function actualizarEstadoOrden(
+  req: Request,
+  ordenID: number
+): Promise<Response> {
+  try {
+    const body = await getRequestBody<ActualizarEstadoOrdenDTO>(req);
+    if (!body) {
+      return errorResponse('Cuerpo de la petición inválido');
+    }
+
+    // Validar campo requerido
+    if (!body.nuevoEstado) {
+      return errorResponse('El nuevo estado es requerido');
+    }
+
+    // Validar que el estado sea válido
+    if (!ESTADOS_ORDEN.includes(body.nuevoEstado as EstadoOrden)) {
+      return errorResponse(
+        `Estado inválido. Estados permitidos: ${ESTADOS_ORDEN.join(', ')}`,
+        undefined,
+        400
+      );
+    }
+
+    // Validaciones adicionales según el estado
+    if (body.nuevoEstado === 'Finalizada') {
+      if (!body.diagnosticoTecnico) {
+        return errorResponse('El diagnóstico técnico es requerido para finalizar la orden');
+      }
+      if (!body.kilometrajeSalida) {
+        return errorResponse('El kilometraje de salida es requerido para finalizar la orden');
+      }
+    }
+
+    if (body.kilometrajeSalida !== undefined && body.kilometrajeSalida !== null && body.kilometrajeSalida < 0) {
+      return errorResponse('El kilometraje de salida debe ser mayor o igual a 0');
+    }
+
+    // Verificar estado actual para validar transiciones
+    const queryEstadoActual = `
+      SELECT EstadoOrden, KilometrajeIngreso
+      FROM OrdenesServicio
+      WHERE OrdenServicioID = @ordenID
+    `;
+    const resultEstadoActual = await executeQuery(queryEstadoActual, [
+      { name: 'ordenID', type: 'Int', value: ordenID }
+    ]);
+
+    if (resultEstadoActual.recordset.length === 0) {
+      return errorResponse('Orden no encontrada', undefined, 404);
+    }
+
+    const estadoActual = resultEstadoActual.recordset[0].EstadoOrden;
+    const kilometrajeIngreso = resultEstadoActual.recordset[0].KilometrajeIngreso;
+
+    // Validar transiciones de estado
+    const transicionesInvalidas: { [key: string]: string[] } = {
+      'Cancelada': ['Pendiente', 'En Proceso', 'En Espera', 'Finalizada', 'Entregada'],
+      'Entregada': ['Pendiente', 'En Proceso', 'En Espera'],
+      'Finalizada': ['Pendiente', 'En Proceso', 'En Espera']
+    };
+
+    if (transicionesInvalidas[estadoActual]?.includes(body.nuevoEstado)) {
+      return errorResponse(
+        `No se puede cambiar de estado ${estadoActual} a ${body.nuevoEstado}`,
+        undefined,
+        400
+      );
+    }
+
+    // No permitir cambiar a un estado ya establecido
+    if (estadoActual === body.nuevoEstado) {
+      return errorResponse(`La orden ya está en estado ${body.nuevoEstado}`, undefined, 400);
+    }
+
+    // Validar que kilometraje de salida sea mayor o igual al de ingreso
+    if (body.kilometrajeSalida && kilometrajeIngreso && body.kilometrajeSalida < kilometrajeIngreso) {
+      return errorResponse(
+        'El kilometraje de salida no puede ser menor al kilometraje de ingreso',
+        undefined,
+        400
+      );
+    }
+
+    // Ejecutar SP
+    const result = await executeStoredProcedure('SP_ActualizarEstadoOrden', {
+      OrdenServicioID: ordenID,
+      NuevoEstado: body.nuevoEstado,
+      Observaciones: body.observaciones || null,
+      DiagnosticoTecnico: body.diagnosticoTecnico || null,
+      KilometrajeSalida: body.kilometrajeSalida || null,
+    });
+
+    return successResponse(
+      { mensaje: result.recordset[0]?.Mensaje || 'Estado actualizado' },
+      'Estado de orden actualizado exitosamente'
+    );
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Obtener historial de un vehículo
+ * GET /api/ordenes/historial/:vehiculoID
+ */
+export async function obtenerHistorialVehiculo(
+  _req: Request,
+  vehiculoID: number
+): Promise<Response> {
+  try {
+    const result = await executeStoredProcedure('SP_HistorialVehiculo', {
+      VehiculoID: vehiculoID,
+    });
+
+    return successResponse(
+      {
+        vehiculo: result.recordsets[0]?.[0] || null,
+        historial: result.recordsets[1] || [],
+      },
+      'Historial obtenido exitosamente'
+    );
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Obtener historial por placa
+ * GET /api/ordenes/historial/placa/:placa
+ */
+export async function obtenerHistorialPorPlaca(
+  _req: Request,
+  placa: string
+): Promise<Response> {
+  try {
+    const result = await executeStoredProcedure('SP_HistorialVehiculo', {
+      Placa: placa,
+    });
+
+    if (!result.recordsets[0] || result.recordsets[0].length === 0) {
+      return errorResponse('Vehículo no encontrado', undefined, 404);
+    }
+
+    return successResponse(
+      {
+        vehiculo: result.recordsets[0][0],
+        historial: result.recordsets[1] || [],
+      },
+      'Historial obtenido exitosamente'
+    );
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Actualizar orden de servicio
+ * PUT /api/ordenes/:id
+ */
+export async function actualizarOrden(
+  req: Request,
+  ordenID: number
+): Promise<Response> {
+  try {
+    const body = await getRequestBody<{
+      KilometrajeIngreso?: number;
+      MotivoIngreso?: string;
+      Observaciones?: string;
+      MecanicoAsignadoID?: number;
+      FechaSalidaEstimada?: string;
+      EstadoOrden?: string;
+    }>(req);
+
+    if (!body) {
+      return errorResponse('Cuerpo de la petición inválido');
+    }
+
+    // Validaciones de campos
+    if (body.KilometrajeIngreso !== undefined && body.KilometrajeIngreso < 0) {
+      return errorResponse('El kilometraje debe ser mayor o igual a 0');
+    }
+
+    // Verificar que la orden existe y está en estado editable
+    const queryVerificar = `
+      SELECT EstadoOrden
+      FROM OrdenesServicio
+      WHERE OrdenServicioID = @ordenID
+    `;
+    const resultVerificar = await executeQuery(queryVerificar, [
+      { name: 'ordenID', type: 'Int', value: ordenID }
+    ]);
+
+    if (resultVerificar.recordset.length === 0) {
+      return errorResponse('Orden no encontrada', undefined, 404);
+    }
+
+    const estadoActual = resultVerificar.recordset[0].EstadoOrden;
+
+    // No permitir edición de órdenes finalizadas o canceladas
+    if (estadoActual === 'Finalizada' || estadoActual === 'Cancelada' || estadoActual === 'Entregada') {
+      return errorResponse(
+        `No se puede actualizar una orden en estado ${estadoActual}`,
+        undefined,
+        400
+      );
+    }
+
+    // Validar que el mecánico existe si se proporciona
+    if (body.MecanicoAsignadoID !== undefined && body.MecanicoAsignadoID !== null) {
+      const queryMecanico = `
+        SELECT MecanicoID
+        FROM Mecanicos
+        WHERE MecanicoID = @mecanicoID AND Estado = 1
+      `;
+      const resultMecanico = await executeQuery(queryMecanico, [
+        { name: 'mecanicoID', type: 'Int', value: body.MecanicoAsignadoID }
+      ]);
+
+      if (resultMecanico.recordset.length === 0) {
+        return errorResponse('Mecánico no encontrado o inactivo', undefined, 400);
+      }
+    }
+
+    // Validar EstadoOrden si se proporciona
+    if (body.EstadoOrden !== undefined) {
+      const estadosPermitidos = ['Recibida', 'En Proceso', 'En Diagnóstico', 'Completada', 'Finalizada', 'Cancelada', 'Entregada'];
+      if (!estadosPermitidos.includes(body.EstadoOrden)) {
+        return errorResponse(
+          `EstadoOrden debe ser uno de: ${estadosPermitidos.join(', ')}`,
+          undefined,
+          400
+        );
+      }
+    }
+
+    // Construir query de actualización con parámetros
+    const updates: string[] = [];
+    const params: any[] = [{ name: 'ordenID', type: 'Int', value: ordenID }];
+    let paramCount = 1;
+
+    if (body.KilometrajeIngreso !== undefined) {
+      updates.push(`KilometrajeIngreso = @param${paramCount}`);
+      params.push({ name: `param${paramCount}`, type: 'Int', value: body.KilometrajeIngreso });
+      paramCount++;
+    }
+
+    if (body.MotivoIngreso !== undefined) {
+      updates.push(`MotivoIngreso = @param${paramCount}`);
+      params.push({ name: `param${paramCount}`, type: 'NVarChar', value: body.MotivoIngreso });
+      paramCount++;
+    }
+
+    if (body.Observaciones !== undefined) {
+      updates.push(`Observaciones = @param${paramCount}`);
+      params.push({ name: `param${paramCount}`, type: 'NVarChar', value: body.Observaciones });
+      paramCount++;
+    }
+
+    if (body.MecanicoAsignadoID !== undefined) {
+      updates.push(`MecanicoAsignadoID = @param${paramCount}`);
+      params.push({
+        name: `param${paramCount}`,
+        type: 'Int',
+        value: body.MecanicoAsignadoID === null ? null : body.MecanicoAsignadoID
+      });
+      paramCount++;
+    }
+
+    if (body.FechaSalidaEstimada !== undefined) {
+      updates.push(`FechaSalidaEstimada = @param${paramCount}`);
+      params.push({
+        name: `param${paramCount}`,
+        type: 'DateTime',
+        value: body.FechaSalidaEstimada === null ? null : body.FechaSalidaEstimada
+      });
+      paramCount++;
+    }
+
+    if (body.EstadoOrden !== undefined) {
+      updates.push(`EstadoOrden = @param${paramCount}`);
+      params.push({ name: `param${paramCount}`, type: 'NVarChar', value: body.EstadoOrden });
+      paramCount++;
+    }
+
+    if (updates.length === 0) {
+      return errorResponse('No hay campos para actualizar');
+    }
+
+    const query = `
+      UPDATE OrdenesServicio
+      SET ${updates.join(', ')}
+      WHERE OrdenServicioID = @ordenID
+    `;
+
+    const result = await executeQuery(query, params);
+
+    // Verificar que se actualizó al menos una fila
+    if (result.rowsAffected[0] === 0) {
+      return errorResponse('No se pudo actualizar la orden', undefined, 500);
+    }
+
+    return successResponse(
+      { mensaje: 'Orden actualizada exitosamente' },
+      'Orden de servicio actualizada exitosamente'
+    );
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Eliminar/Cancelar orden de servicio
+ * DELETE /api/ordenes/:id
+ */
+export async function cancelarOrdenServicio(
+  _req: Request,
+  ordenID: number
+): Promise<Response> {
+  try {
+    await executeStoredProcedure('SP_ActualizarEstadoOrden', {
+      OrdenServicioID: ordenID,
+      NuevoEstado: 'Cancelada',
+      Observaciones: 'Cancelada por usuario',
+    });
+
+    return successResponse(
+      { mensaje: 'Orden cancelada exitosamente' },
+      'Orden de servicio cancelada'
+    );
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Agregar servicio a orden existente
+ * POST /api/ordenes/:id/agregar-servicio
+ */
+export async function agregarServicioAOrden(
+  req: Request,
+  ordenID: number
+): Promise<Response> {
+  try {
+    const body = await getRequestBody<{
+      TipoServicioID: number;
+      Cantidad: number;
+      PrecioUnitario: number;
+      UsuarioID?: number;
+    }>(req);
+
+    if (!body) {
+      return errorResponse('Cuerpo de la petición inválido');
+    }
+
+    // UsuarioID por defecto si no se proporciona (temporalmente hasta implementar autenticación)
+    const usuarioID = body.UsuarioID || 1;
+
+    // Validar campos requeridos
+    const errors = validateRequiredFields(body, [
+      'TipoServicioID',
+      'Cantidad',
+      'PrecioUnitario',
+    ]);
+
+    if (errors.length > 0) {
+      return validationErrorResponse(errors);
+    }
+
+    // Validar que la cantidad sea positiva
+    if (body.Cantidad <= 0) {
+      return errorResponse('La cantidad debe ser mayor a 0');
+    }
+
+    // Validar que el precio sea válido
+    if (body.PrecioUnitario < 0) {
+      return errorResponse('El precio unitario debe ser mayor o igual a 0');
+    }
+
+    // Verificar que la orden existe y está en estado editable
+    const queryVerificar = `
+      SELECT EstadoOrden
+      FROM OrdenesServicio
+      WHERE OrdenServicioID = @ordenID
+    `;
+    const resultVerificar = await executeQuery(queryVerificar, [
+      { name: 'ordenID', type: 'Int', value: ordenID }
+    ]);
+
+    if (resultVerificar.recordset.length === 0) {
+      return errorResponse('Orden no encontrada', undefined, 404);
+    }
+
+    const estadoActual = resultVerificar.recordset[0].EstadoOrden;
+
+    // No permitir agregar servicios a órdenes finalizadas, canceladas o entregadas
+    if (estadoActual === 'Finalizada' || estadoActual === 'Cancelada' || estadoActual === 'Entregada') {
+      return errorResponse(
+        `No se pueden agregar servicios a una orden en estado ${estadoActual}`,
+        undefined,
+        400
+      );
+    }
+
+    // Verificar que el servicio existe
+    const queryServicio = `
+      SELECT TipoServicioID, NombreServicio
+      FROM TiposServicio
+      WHERE TipoServicioID = @tipoServicioID AND Estado = 1
+    `;
+    const resultServicio = await executeQuery(queryServicio, [
+      { name: 'tipoServicioID', type: 'Int', value: body.TipoServicioID }
+    ]);
+
+    if (resultServicio.recordset.length === 0) {
+      return errorResponse('Servicio no encontrado o inactivo', undefined, 400);
+    }
+
+    // Ejecutar SP para agregar el servicio
+    const result = await executeStoredProcedure(
+      'SP_AgregarServicioAOrden',
+      {
+        OrdenServicioID: ordenID,
+        TipoServicioID: body.TipoServicioID,
+        Cantidad: body.Cantidad,
+        PrecioUnitario: body.PrecioUnitario,
+        UsuarioID: usuarioID,
+      },
+      {
+        DetalleOrdenServicioID: sql.Int(),
+      }
+    );
+
+    return successResponse(
+      {
+        detalleOrdenServicioID: result.output.DetalleOrdenServicioID,
+        mensaje: result.recordset[0]?.Mensaje || 'Servicio agregado exitosamente',
+      },
+      'Servicio agregado exitosamente a la orden',
+      201
+    );
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Agregar producto/repuesto a orden existente
+ * POST /api/ordenes/:id/agregar-producto
+ */
+export async function agregarProductoAOrden(
+  req: Request,
+  ordenID: number
+): Promise<Response> {
+  try {
+    const body = await getRequestBody<{
+      ProductoID: number;
+      Cantidad: number;
+      PrecioUnitario: number;
+    }>(req);
+
+    if (!body) {
+      return errorResponse('Cuerpo de la petición inválido');
+    }
+
+    // Validar campos requeridos
+    const errors = validateRequiredFields(body, [
+      'ProductoID',
+      'Cantidad',
+      'PrecioUnitario',
+    ]);
+
+    if (errors.length > 0) {
+      return validationErrorResponse(errors);
+    }
+
+    // Validar que la cantidad sea positiva
+    if (body.Cantidad <= 0) {
+      return errorResponse('La cantidad debe ser mayor a 0');
+    }
+
+    // Validar que el precio sea válido
+    if (body.PrecioUnitario < 0) {
+      return errorResponse('El precio unitario debe ser mayor o igual a 0');
+    }
+
+    // Verificar que la orden existe y está en estado editable
+    const queryVerificar = `
+      SELECT EstadoOrden
+      FROM OrdenesServicio
+      WHERE OrdenServicioID = @ordenID
+    `;
+    const resultVerificar = await executeQuery(queryVerificar, [
+      { name: 'ordenID', type: 'Int', value: ordenID }
+    ]);
+
+    if (resultVerificar.recordset.length === 0) {
+      return errorResponse('Orden no encontrada', undefined, 404);
+    }
+
+    const estadoActual = resultVerificar.recordset[0].EstadoOrden;
+
+    // No permitir agregar productos a órdenes finalizadas, canceladas o entregadas
+    if (estadoActual === 'Finalizada' || estadoActual === 'Cancelada' || estadoActual === 'Entregada') {
+      return errorResponse(
+        `No se pueden agregar productos a una orden en estado ${estadoActual}`,
+        undefined,
+        400
+      );
+    }
+
+    // Verificar que el producto existe y hay stock suficiente
+    const queryProducto = `
+      SELECT ProductoID, NombreProducto, Stock
+      FROM Productos
+      WHERE ProductoID = @productoID AND Estado = 1
+    `;
+    const resultProducto = await executeQuery(queryProducto, [
+      { name: 'productoID', type: 'Int', value: body.ProductoID }
+    ]);
+
+    if (resultProducto.recordset.length === 0) {
+      return errorResponse('Producto no encontrado o inactivo', undefined, 400);
+    }
+
+    const stockDisponible = resultProducto.recordset[0].Stock;
+    if (body.Cantidad > stockDisponible) {
+      return errorResponse(
+        `Stock insuficiente. Disponible: ${stockDisponible}, Solicitado: ${body.Cantidad}`,
+        undefined,
+        400
+      );
+    }
+
+    // Ejecutar SP para agregar el producto
+    const result = await executeStoredProcedure(
+      'SP_AgregarProductoAOrden',
+      {
+        OrdenServicioID: ordenID,
+        ProductoID: body.ProductoID,
+        Cantidad: body.Cantidad,
+        PrecioUnitario: body.PrecioUnitario,
+      },
+      {
+        RepuestoOrdenServicioID: sql.Int(),
+      }
+    );
+
+    return successResponse(
+      {
+        repuestoOrdenServicioID: result.output.RepuestoOrdenServicioID,
+        mensaje: result.recordset[0]?.Mensaje || 'Producto agregado exitosamente',
+      },
+      'Producto agregado exitosamente a la orden',
+      201
+    );
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}
+
+/**
+ * Agregar combo completo a orden existente
+ * POST /api/ordenes/:id/agregar-combo
+ */
+export async function agregarComboAOrden(
+  req: Request,
+  ordenID: number
+): Promise<Response> {
+  try {
+    const body = await getRequestBody<{
+      ComboID: number;
+    }>(req);
+
+    if (!body) {
+      return errorResponse('Cuerpo de la petición inválido');
+    }
+
+    // Validar campos requeridos
+    const errors = validateRequiredFields(body, ['ComboID']);
+    if (errors.length > 0) {
+      return validationErrorResponse(errors);
+    }
+
+    // Verificar que la orden existe y está en estado editable
+    const queryVerificar = `
+      SELECT EstadoOrden
+      FROM OrdenesServicio
+      WHERE OrdenServicioID = @ordenID
+    `;
+    const resultVerificar = await executeQuery(queryVerificar, [
+      { name: 'ordenID', type: 'Int', value: ordenID }
+    ]);
+
+    if (resultVerificar.recordset.length === 0) {
+      return errorResponse('Orden no encontrada', undefined, 404);
+    }
+
+    const estadoActual = resultVerificar.recordset[0].EstadoOrden;
+    if (estadoActual === 'Finalizada' || estadoActual === 'Cancelada' || estadoActual === 'Entregada') {
+      return errorResponse(
+        `No se pueden agregar combos a una orden en estado ${estadoActual}`,
+        undefined,
+        400
+      );
+    }
+
+    // Obtener detalle del combo
+    const resultCombo = await executeStoredProcedure('SP_ObtenerDetalleCombo', {
+      ComboID: body.ComboID,
+    });
+
+    if (!resultCombo.recordsets[0] || resultCombo.recordsets[0].length === 0) {
+      return errorResponse('Combo no encontrado', undefined, 404);
+    }
+
+    const servicios = resultCombo.recordsets[1] || [];
+    const productos = resultCombo.recordsets[2] || [];
+
+    // Validar stock de productos antes de agregar
+    if (productos.length > 0) {
+      const validacionStock = await executeStoredProcedure('SP_ValidarStockCombo', {
+        ComboID: body.ComboID,
+      });
+
+      if (validacionStock.recordset.length > 0) {
+        const productosInsuficientes = validacionStock.recordset.map((p: any) =>
+          `${p.NombreProducto} (Disponible: ${p.StockDisponible}, Requerido: ${p.CantidadRequerida})`
+        ).join(', ');
+
+        return errorResponse(
+          `Stock insuficiente para: ${productosInsuficientes}`,
+          undefined,
+          400
+        );
+      }
+    }
+
+    const usuarioID = 1; // Temporalmente hasta implementar autenticación
+    const itemsAgregados = {
+      servicios: 0,
+      productos: 0
+    };
+
+    // Agregar servicios del combo
+    for (const servicio of servicios) {
+      await executeStoredProcedure(
+        'SP_AgregarServicioAOrden',
+        {
+          OrdenServicioID: ordenID,
+          TipoServicioID: servicio.TipoServicioID,
+          Cantidad: servicio.Cantidad,
+          PrecioUnitario: servicio.PrecioBase,
+          UsuarioID: usuarioID,
+        },
+        {
+          DetalleOrdenServicioID: sql.Int,
+        }
+      );
+      itemsAgregados.servicios++;
+    }
+
+    // Agregar productos del combo
+    for (const producto of productos) {
+      await executeStoredProcedure(
+        'SP_AgregarProductoAOrden',
+        {
+          OrdenServicioID: ordenID,
+          ProductoID: producto.ProductoID,
+          Cantidad: producto.Cantidad,
+          PrecioUnitario: producto.PrecioVenta,
+        },
+        {
+          RepuestoOrdenServicioID: sql.Int,
+        }
+      );
+      itemsAgregados.productos++;
+    }
+
+    return successResponse(
+      {
+        mensaje: `Combo agregado exitosamente: ${itemsAgregados.servicios} servicio(s), ${itemsAgregados.productos} producto(s)`,
+        itemsAgregados,
+      },
+      'Combo agregado exitosamente a la orden',
+      201
+    );
+  } catch (error: any) {
+    return handleSQLError(error);
+  }
+}

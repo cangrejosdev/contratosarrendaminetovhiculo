@@ -1,0 +1,83 @@
+/* Estilos adicionales para el componente de registro de incidentes */
+
+/* Animación de fade-in para mensajes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bg-green-100,
+.bg-red-100 {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Estilos para campos con error */
+input.border-red-500,
+textarea.border-red-500,
+select.border-red-500 {
+  border-width: 2px;
+}
+
+/* Mejora visual para campos de formulario */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(230, 228, 159, 0.3);
+}
+
+/* Estilos para botones deshabilitados */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Hover en botones */
+button:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+button:not(:disabled):active {
+  transform: translateY(0);
+}
+
+/* Transiciones suaves */
+button,
+input,
+textarea,
+select {
+  transition: all 0.2s ease;
+}
+
+/* Estilos para el contenedor principal */
+.container {
+  min-height: 100vh;
+  background: #E3E7D3;
+}
+
+/* Sombra para la tarjeta principal */
+.shadow-lg {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+  }
+  
+  h2 {
+    font-size: 1.25rem;
+  }
+}

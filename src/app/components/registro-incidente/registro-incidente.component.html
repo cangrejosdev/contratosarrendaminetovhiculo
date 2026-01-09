@@ -1,0 +1,850 @@
+<div class="min-h-screen px-4 py-8 lg:py-12 bg-[#E3E7D3]">
+  <div class="container max-w-7xl mx-auto">
+    <!-- Encabezado Principal -->
+    <div class="mb-10 text-center">
+      <div class="inline-flex items-center justify-center w-16 h-16 mb-5 bg-[#E6E49F] rounded-xl shadow-sm transform hover:scale-105 transition-all duration-300">
+        <svg class="w-9 h-9 text-[#25291C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+      </div>
+      <h1 class="mb-3 text-3xl font-bold text-[#25291C] md:text-4xl tracking-tight">
+        Contrato de Arrendamiento de Vehículo
+      </h1>
+      <p class="text-base text-[#989C94] font-medium">Complete el formulario con los datos del contrato</p>
+    </div>
+
+    <!-- Mensajes -->
+    @if (mensajeExito()) {
+      <div class="px-5 py-4 mb-6 border-l-4 rounded-lg shadow-sm bg-white border-[#E6E49F]">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 mr-3 text-[#25291C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="font-medium text-[#25291C]">{{ mensajeExito() }}</span>
+        </div>
+      </div>
+    }
+
+    @if (mensajeError()) {
+      <div class="px-5 py-4 mb-6 bg-white border-l-4 border-red-400 rounded-lg shadow-sm">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 mr-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="font-medium text-red-800">{{ mensajeError() }}</span>
+        </div>
+      </div>
+    }
+
+    <!-- Card Principal -->
+    <div class="overflow-hidden bg-white border border-[#BDC2BF]/30 shadow-lg rounded-lg">
+      <!-- Formulario -->
+      <form [formGroup]="formularioIncidente" class="p-5 space-y-7 md:p-8">
+
+        <!-- Sección 1: Información del Contrato -->
+        <div class="relative p-5 md:p-7 bg-white rounded-lg border border-[#BDC2BF]/40 shadow-sm hover:shadow-md transition-shadow duration-200">
+          <h2 class="relative flex items-center mb-6 text-xl font-bold text-[#25291C]">
+            <span class="flex items-center justify-center w-10 h-10 mr-3 text-[#25291C] bg-[#E6E49F] rounded-lg shadow-sm font-bold text-lg">1</span>
+            Información del Contrato
+          </h2>
+
+          <div class="relative grid grid-cols-1 gap-6 md:grid-cols-2">
+
+            <!-- Tipo de Búsqueda -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Tipo de Búsqueda
+              </label>
+              <select
+                formControlName="tipo_busqueda"
+                class="w-full px-4 py-2.5 border border-[#BDC2BF] rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] outline-none">
+                <option value="">Seleccione un tipo...</option>
+                <option value="Entrevistas">Entrevistas</option>
+                <option value="PTY">PTY</option>
+              </select>
+            </div>
+
+            <!-- Cédula -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Cédula
+              </label>
+              <input
+                type="text"
+                formControlName="cedula"
+                (keydown.enter)="buscarPorCedula($event)"
+                placeholder="Ingrese la cédula y presione Enter"
+                class="w-full px-4 py-2.5 border border-[#BDC2BF] rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              <p class="mt-1.5 text-xs text-[#989C94]">Presione Enter para buscar</p>
+            </div>
+
+            <!-- Número de Operador -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Número de Operador
+              </label>
+              <input
+                type="text"
+                formControlName="numero_operador"
+                (keydown.enter)="validarOperador($event)"
+                placeholder="Número de operador"
+                [class.border-red-400]="campoInvalido('numero_operador')"
+                [class.border-[#BDC2BF]]="!campoInvalido('numero_operador')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('numero_operador')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('numero_operador') }}
+                </p>
+              }
+            </div>
+
+            <!-- ID Operador NetSuite -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                ID Operador NetSuite <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="idopNetSuite"
+                placeholder="ID del operador en NetSuite"
+                [class.border-red-400]="campoInvalido('idopNetSuite')"
+                [class.border-[#BDC2BF]]="!campoInvalido('idopNetSuite')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('idopNetSuite')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('idopNetSuite') }}
+                </p>
+              }
+            </div>
+
+            <!-- Fecha del Contrato -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Fecha del Contrato <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                formControlName="fecha_contrato"
+                [class.border-red-400]="campoInvalido('fecha_contrato')"
+                [class.border-[#BDC2BF]]="!campoInvalido('fecha_contrato')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] outline-none">
+            </div>
+
+            <!-- Desglose de Fecha (Solo lectura) -->
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="block mb-1 text-xs font-semibold text-[#989C94]">Día</label>
+                <input type="text" formControlName="dia" readonly class="w-full px-3 py-2 bg-[#E3E7D3]/40 border border-[#BDC2BF]/50 rounded-lg text-center text-[#25291C] font-medium">
+              </div>
+              <div>
+                <label class="block mb-1 text-xs font-semibold text-[#989C94]">Mes</label>
+                <input type="text" formControlName="mes" readonly class="w-full px-3 py-2 bg-[#E3E7D3]/40 border border-[#BDC2BF]/50 rounded-lg text-center text-[#25291C] font-medium">
+              </div>
+              <div>
+                <label class="block mb-1 text-xs font-semibold text-[#989C94]">Año</label>
+                <input type="text" formControlName="anio_contrato" readonly class="w-full px-3 py-2 bg-[#E3E7D3]/40 border border-[#BDC2BF]/50 rounded-lg text-center text-[#25291C] font-medium">
+              </div>
+            </div>
+
+            <!-- Número de Unidad -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Número de Unidad
+              </label>
+              <input
+                type="text"
+                formControlName="numero_unidad"
+                (keydown.enter)="validarUnidad($event)"
+                placeholder="Número de unidad"
+                [class.border-red-400]="campoInvalido('numero_unidad')"
+                [class.border-[#BDC2BF]]="!campoInvalido('numero_unidad')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('numero_unidad')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('numero_unidad') }}
+                </p>
+              }
+            </div>
+
+            <!-- Representante -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Representante <span class="text-red-500">*</span>
+              </label>
+              <select
+                formControlName="representante"
+                [class.border-red-400]="campoInvalido('representante')"
+                [class.border-[#BDC2BF]]="!campoInvalido('representante')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] outline-none">
+                <option value="">Seleccione un contrato...</option>
+                @for (c of contratos; track c.nombres) {
+                  <option [value]="c.nombres">{{ c.nombres }} - {{ c.cedula }}</option>
+                }
+              </select>
+              @if (campoInvalido('contrato')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('contrato') }}
+                </p>
+              }
+            </div>
+
+            <!-- Sociedad -->
+            <div class="relative">
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Sociedad <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="sociedad"
+                placeholder="Nombre de la sociedad"
+                [class.border-red-400]="campoInvalido('sociedad')"
+                [class.border-[#BDC2BF]]="!campoInvalido('sociedad')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('sociedad')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('sociedad') }}
+                </p>
+              }
+            </div>
+
+            <!-- Folio -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Folio <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="folio"
+                placeholder="Número de folio"
+                [class.border-red-400]="campoInvalido('folio')"
+                [class.border-[#BDC2BF]]="!campoInvalido('folio')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('folio')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('folio') }}
+                </p>
+              }
+            </div>
+
+            <!-- Registro -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Registro <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="registro"
+                placeholder="Número de registro"
+                [class.border-red-400]="campoInvalido('registro')"
+                [class.border-[#BDC2BF]]="!campoInvalido('registro')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('registro')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('registro') }}
+                </p>
+              }
+            </div>
+
+            <!-- Representada -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Representada <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="representada"
+                placeholder="Nombre de la representada"
+                [class.border-red-400]="campoInvalido('representada')"
+                [class.border-[#BDC2BF]]="!campoInvalido('representada')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('representada')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('representada') }}
+                </p>
+              }
+            </div>
+
+            <!-- Arrendador -->
+            <div class="md:col-span-2">
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Arrendador <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="arrendador"
+                placeholder="Nombre completo del arrendador"
+                [class.border-red-400]="campoInvalido('arrendador')"
+                [class.border-[#BDC2BF]]="!campoInvalido('arrendador')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('arrendador')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('arrendador') }}
+                </p>
+              }
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Sección 2: Placas del Vehículo -->
+        <div class="relative p-5 md:p-7 bg-white rounded-lg border border-[#BDC2BF]/40 shadow-sm hover:shadow-md transition-shadow duration-200">
+          <h2 class="relative flex items-center mb-6 text-xl font-bold text-[#25291C]">
+            <span class="flex items-center justify-center w-10 h-10 mr-3 text-[#25291C] bg-[#E6E49F] rounded-lg shadow-sm font-bold text-lg">2</span>
+            Placas del Vehículo
+          </h2>
+
+          <div class="relative grid grid-cols-1 gap-6 md:grid-cols-2">
+            <!-- Placa U -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Placa U <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="placa_u"
+                placeholder="Ej: 123456"
+                [class.border-red-400]="campoInvalido('placa_u')"
+                [class.border-[#BDC2BF]]="!campoInvalido('placa_u')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none uppercase font-mono tracking-wider">
+              @if (campoInvalido('placa_u')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('placa_u') }}
+                </p>
+              }
+            </div>
+
+            <!-- Placa C -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Placa C <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="placa_c"
+                placeholder="Ej: 789012"
+                [class.border-red-400]="campoInvalido('placa_c')"
+                [class.border-[#BDC2BF]]="!campoInvalido('placa_c')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none uppercase font-mono tracking-wider">
+              @if (campoInvalido('placa_c')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('placa_c') }}
+                </p>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección 3: Información del Vehículo -->
+        <div class="relative p-5 md:p-7 bg-white rounded-lg border border-[#BDC2BF]/40 shadow-sm hover:shadow-md transition-shadow duration-200">
+          <h2 class="relative flex items-center mb-6 text-xl font-bold text-[#25291C]">
+            <span class="flex items-center justify-center w-10 h-10 mr-3 text-[#25291C] bg-[#E6E49F] rounded-lg shadow-sm font-bold text-lg">3</span>
+            Información del Vehículo
+          </h2>
+
+          <div class="relative grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <!-- Marca -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Marca <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="marca"
+                placeholder="Ej: Toyota, Honda"
+                [class.border-red-400]="campoInvalido('marca')"
+                [class.border-[#BDC2BF]]="!campoInvalido('marca')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('marca')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('marca') }}
+                </p>
+              }
+            </div>
+
+            <!-- Modelo -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Modelo <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="modelo"
+                placeholder="Ej: Corolla"
+                [class.border-red-400]="campoInvalido('modelo')"
+                [class.border-[#BDC2BF]]="!campoInvalido('modelo')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('modelo')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('modelo') }}
+                </p>
+              }
+            </div>
+
+            <!-- Año -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Año <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="anio"
+                placeholder="Ej: 2023"
+                [class.border-red-400]="campoInvalido('anio')"
+                [class.border-[#BDC2BF]]="!campoInvalido('anio')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('anio')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('anio') }}
+                </p>
+              }
+            </div>
+
+            <!-- Color -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Color <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="color"
+                placeholder="Ej: Blanco, Negro"
+                [class.border-red-400]="campoInvalido('color')"
+                [class.border-[#BDC2BF]]="!campoInvalido('color')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('color')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('color') }}
+                </p>
+              }
+            </div>
+
+            <!-- Transmisión -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Transmisión <span class="text-red-500">*</span>
+              </label>
+              <select
+                formControlName="transmision"
+                [class.border-red-400]="campoInvalido('transmision')"
+                [class.border-[#BDC2BF]]="!campoInvalido('transmision')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+                <option value="">Seleccione...</option>
+                <option *ngFor="let tipo of tiposTransmision" [value]="tipo">{{ tipo }}</option>
+              </select>
+              @if (campoInvalido('transmision')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('transmision') }}
+                </p>
+              }
+            </div>
+
+            <!-- Pasajeros -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Pasajeros <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                formControlName="pasajeros"
+                placeholder="Ej: 5"
+                min="1"
+                [class.border-red-400]="campoInvalido('pasajeros')"
+                [class.border-[#BDC2BF]]="!campoInvalido('pasajeros')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              @if (campoInvalido('pasajeros')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('pasajeros') }}
+                </p>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección 4: Series del Vehículo -->
+        <div class="relative p-5 md:p-7 bg-white rounded-lg border border-[#BDC2BF]/40 shadow-sm hover:shadow-md transition-shadow duration-200">
+          <h2 class="relative flex items-center mb-6 text-xl font-bold text-[#25291C]">
+            <span class="flex items-center justify-center w-10 h-10 mr-3 text-[#25291C] bg-[#E6E49F] rounded-lg shadow-sm font-bold text-lg">4</span>
+            Series del Vehículo
+          </h2>
+
+          <div class="relative grid grid-cols-1 gap-6 md:grid-cols-2">
+            <!-- Serie de Chasis -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Serie de Chasis <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="ser_chasis"
+                placeholder="Número de serie del chasis"
+                [class.border-red-400]="campoInvalido('ser_chasis')"
+                [class.border-[#BDC2BF]]="!campoInvalido('ser_chasis')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none uppercase font-mono tracking-wider">
+              @if (campoInvalido('ser_chasis')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('ser_chasis') }}
+                </p>
+              }
+            </div>
+
+            <!-- Serie de Motor -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Serie de Motor <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                formControlName="ser_motor"
+                placeholder="Número de serie del motor"
+                [class.border-red-400]="campoInvalido('ser_motor')"
+                [class.border-[#BDC2BF]]="!campoInvalido('ser_motor')"
+                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none uppercase font-mono tracking-wider">
+              @if (campoInvalido('ser_motor')) {
+                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
+                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                  </svg>
+                  {{ obtenerMensajeError('ser_motor') }}
+                </p>
+              } 
+            </div>
+          </div>  
+        </div>
+
+        <!-- Sección: Plantilla Word -->
+        <div class="relative p-5 md:p-7 bg-white rounded-lg border border-[#BDC2BF]/40 shadow-sm hover:shadow-md transition-shadow duration-200">
+          <h2 class="relative flex items-center mb-6 text-xl font-bold text-[#25291C]">
+            <span class="flex items-center justify-center w-10 h-10 mr-3 text-[#25291C] bg-[#E6E49F] rounded-lg shadow-sm">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </span>
+            Plantillas Word Contratos
+          </h2> 
+
+          <div class="relative space-y-4">
+            <p class="text-sm leading-relaxed text-[#989C94]">
+              Puede usar su propia plantilla Word (.docx) para generar el documento del contrato personalizado.
+            </p>
+
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Seleccionar Plantilla Personal
+              </label>
+              <input
+                type="file"
+                formControlName="plantilla"
+
+                accept=".docx"
+                (change)="seleccionarPlantilla($event)"
+                class="block w-full text-sm text-[#25291C] cursor-pointer file:mr-4 file:py-2.5 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#E6E49F] file:text-[#25291C] hover:file:bg-[#E6E49F]/80 file:transition-all file:duration-200 file:shadow-sm hover:file:shadow-md">
+            </div>
+
+            <div class="p-4 border border-[#BDC2BF]/50 bg-[#E3E7D3]/30 rounded-lg">
+              <p class="flex items-center mb-3 font-bold text-[#25291C] text-sm">
+                <svg class="w-5 h-5 mr-2 text-[#25291C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
+                </svg>
+                Variables disponibles para su plantilla:
+              </p>
+              <div class="grid grid-cols-2 gap-2 text-xs md:grid-cols-3 lg:grid-cols-4">
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;sociedad&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;folio&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;registro&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;representada&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;arrendador&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;numero_operador&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;numero_unidad&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;placa_u&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;placa_c&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;marca&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;modelo&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;anio&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;color&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;transmision&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;pasajeros&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;serchasis&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;seremotor&#125;</code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex flex-col gap-3 pt-6 border-t border-[#BDC2BF]/40 sm:flex-row sm:flex-wrap sm:justify-end">
+          <button type="button" (click)="limpiarFormulario()"
+            class="group flex items-center justify-center px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 border border-[#BDC2BF] bg-white rounded-lg hover:bg-[#BDC2BF] hover:text-white shadow-sm hover:shadow-md">
+            <svg class="w-4 h-4 mr-2 transition-transform duration-200 group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+            Limpiar
+          </button>
+
+          <button type="button" (click)="guardarContrato()" [disabled]="!formularioIncidente.valid"
+            class="flex items-center justify-center px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-[#E6E49F] rounded-lg hover:bg-[#E6E49F]/80 disabled:bg-[#BDC2BF]/40 disabled:text-[#989C94] disabled:cursor-not-allowed shadow-sm hover:shadow-md">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+            </svg>
+            Guardar Contrato
+          </button>
+
+          <button type="button" (click)="imprimirPDF()" [disabled]="!formularioIncidente.valid"
+            class="flex items-center justify-center px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-white border border-[#BDC2BF] rounded-lg hover:bg-[#E3E7D3] disabled:bg-[#BDC2BF]/20 disabled:text-[#989C94] disabled:cursor-not-allowed shadow-sm hover:shadow-md">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+            </svg>
+            Imprimir PDF
+          </button>
+
+          <button type="button" (click)="descargarPDF()" [disabled]="!formularioIncidente.valid"
+            class="flex items-center justify-center px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-white border border-[#BDC2BF] rounded-lg hover:bg-[#E3E7D3] disabled:bg-[#BDC2BF]/20 disabled:text-[#989C94] disabled:cursor-not-allowed shadow-sm hover:shadow-md">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+            </svg>
+            Descargar PDF
+          </button>
+
+          <button type="button" (click)="generarDesdePlantillaWord()" [disabled]="!formularioIncidente.valid"
+            class="flex items-center justify-center px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-white border border-[#BDC2BF] rounded-lg hover:bg-[#E3E7D3] disabled:bg-[#BDC2BF]/20 disabled:text-[#989C94] disabled:cursor-not-allowed shadow-sm hover:shadow-md">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Generar Word
+          </button>
+
+          <button type="button" (click)="generarWordYPdf()" [disabled]="!formularioIncidente.valid"
+            class="flex items-center justify-center px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-[#E6E49F] rounded-lg hover:bg-[#E6E49F]/80 disabled:bg-[#BDC2BF]/40 disabled:text-[#989C94] disabled:cursor-not-allowed shadow-sm hover:shadow-md">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Generar Word y PDF
+          </button>
+
+          <button type="button" (click)="consultarHistorial()"
+            class="flex items-center justify-center px-5 py-2.5 text-white font-semibold transition-all duration-200 bg-[#25291C] rounded-lg hover:bg-[#25291C]/90 shadow-sm hover:shadow-md">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Consultar Historia de Contratos
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-8 text-center">
+      <p class="text-sm text-[#989C94]">Sistema de Gestión de Contratos de Arrendamiento</p>
+    </div>
+  </div>
+
+  <!-- Dialog Modal Respuesta -->
+  @if (mostrarDialog()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40 backdrop-blur-sm">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md border border-[#BDC2BF]/30">
+        <div class="px-6 py-4 bg-[#E6E49F] rounded-t-lg">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold text-[#25291C] flex items-center">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              Respuesta del Servidor
+            </h3>
+            <button (click)="cerrarDialog()" class="text-[#25291C] hover:bg-[#25291C]/10 rounded-full p-2 transition-colors duration-200">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="p-6">
+          <p class="text-base text-[#25291C] text-center">{{ respuestaContrato()?.mensaje }}</p>
+        </div>
+        <div class="px-6 py-4 bg-[#E3E7D3]/30 border-t border-[#BDC2BF]/30 rounded-b-lg">
+          <button (click)="cerrarDialog()"
+            class="w-full px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-[#E6E49F] rounded-lg hover:bg-[#E6E49F]/80 shadow-sm hover:shadow-md">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Dialog Historial de Contratos -->
+  @if (mostrarHistorial()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40 backdrop-blur-sm">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] overflow-hidden border border-[#BDC2BF]/30">
+        <div class="px-6 py-4 bg-[#25291C] rounded-t-lg">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold text-white flex items-center">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Historia de Contratos
+            </h3>
+            <button (click)="cerrarHistorial()" class="text-white hover:bg-white/20 rounded-full p-2 transition-colors duration-200">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+          @if (historialContratos().length > 0) {
+            <div class="overflow-x-auto shadow-md rounded-lg">
+              <table class="min-w-full divide-y divide-[#BDC2BF]/30">
+                <thead class="bg-[#E3E7D3]/40">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">ID</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">Sociedad</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">Representada</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">Arrendador</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">Fecha</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">Cédula</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">Unidad</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">Transmisión</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">Pasajeros</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">Tipo</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-[#25291C] uppercase tracking-wider">Activo</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-[#BDC2BF]/20">
+                  @for (contrato of historialContratos(); track $index) {
+                    <tr class="hover:bg-[#E3E7D3]/20 transition-colors duration-150">
+                      <td class="px-4 py-3 text-sm text-[#25291C]">{{ contrato.id }}</td>
+                      <td class="px-4 py-3 text-sm text-[#25291C]">{{ contrato.sociedad }}</td>
+                      <td class="px-4 py-3 text-sm text-[#25291C]">{{ contrato.representada }}</td>
+                      <td class="px-4 py-3 text-sm text-[#25291C]">{{ contrato.arrendador }}</td>
+                      <td class="px-4 py-3 text-sm text-[#25291C]">{{ contrato.dia }} {{ contrato.mes }} {{ contrato.anio_contrato }}</td>
+                      <td class="px-4 py-3 text-sm text-[#25291C]">{{ contrato.cedula }}</td>
+                      <td class="px-4 py-3 text-sm text-[#25291C]">{{ contrato.numero_unidad }}</td>
+                      <td class="px-4 py-3 text-sm text-[#25291C]">{{ contrato.transmision }}</td>
+                      <td class="px-4 py-3 text-sm text-[#25291C] text-center">{{ contrato.pasajeros }}</td>
+                      <td class="px-4 py-3 text-sm text-[#25291C]">{{ contrato.Tipo }}</td>
+                      <td class="px-4 py-3 text-sm text-center">
+                        <span [class]="contrato.activo ? 'px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800' : 'px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800'">
+                          {{ contrato.activo ? 'Sí' : 'No' }}
+                        </span>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <p class="text-center text-[#989C94] py-8">No se encontraron contratos</p>
+          }
+        </div>
+        <div class="px-6 py-4 bg-[#E3E7D3]/30 border-t border-[#BDC2BF]/30 rounded-b-lg">
+          <button (click)="cerrarHistorial()"
+            class="w-full px-5 py-2.5 text-white font-semibold transition-all duration-200 bg-[#25291C] rounded-lg hover:bg-[#25291C]/90 shadow-sm hover:shadow-md">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Dialog Advertencia de Plantilla -->
+  @if (mostrarAdvertenciaPlantilla()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40 backdrop-blur-sm">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden border border-[#BDC2BF]/30">
+        <div class="px-6 py-4 bg-yellow-500 rounded-t-lg">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold text-white flex items-center">
+              <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+              Contrato Duplicado Activo
+            </h3>
+            <button (click)="cerrarAdvertenciaPlantilla()" class="text-white hover:text-gray-200 transition-colors duration-150">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="p-6">
+          <div class="flex items-start mb-4">
+            <svg class="w-12 h-12 mr-4 text-yellow-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <div>
+              <p class="text-lg font-bold text-[#25291C] mb-2">¡No se puede crear este contrato!</p>
+              <p class="text-base text-[#25291C] mb-3">
+                No se puede crear un contrato de tipo <span class="font-bold text-yellow-600">{{ tipoSeleccionado() }}</span>
+                mientras exista otro contrato del mismo tipo activo para este operador.
+              </p>
+              <p class="text-sm text-[#989C94]">
+                Estado del contrato anterior: <span class="font-semibold text-green-600">ACTIVO</span>
+              </p>
+              <p class="text-sm text-[#989C94] mt-2">
+                Por favor, desactive el contrato anterior antes de crear uno nuevo del mismo tipo.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="px-6 py-4 bg-[#E3E7D3]/30 border-t border-[#BDC2BF]/30 rounded-b-lg">
+          <button (click)="cerrarAdvertenciaPlantilla()"
+            class="w-full px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-yellow-400 rounded-lg hover:bg-yellow-500 shadow-sm hover:shadow-md">
+            Entendido
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+</div>

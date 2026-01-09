@@ -1,0 +1,30 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import apiRoutes from './routes/index';
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+// Configurar charset UTF-8 para todas las respuestas
+app.use((_req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
+
+// Rutas principales
+app.use('/api', apiRoutes);
+
+// Manejo de 404
+app.use((_req, res) => {
+  res.status(404).json({ success: false, message: 'Ruta no encontrada' });
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+});
