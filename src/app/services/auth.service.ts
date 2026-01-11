@@ -56,20 +56,19 @@ export class AuthService {
         } else if (data.user) {
           // Si no tiene token pero tiene user, crear un token simple
           console.log('No hay token, pero hay usuario. Creando token de sesión.');
-          const sessionToken = `session_${Date.now()}_${data.user.username || 'user'}`;
+          const sessionToken = `session_${Date.now()}_${credentials.usuario}`;
           localStorage.setItem('token', sessionToken);
         }
 
-        // Guardar información del usuario
-        if (data.usuario) {
-          localStorage.setItem('usuario', data.usuario);
-        } else if (data.user?.username) {
-          localStorage.setItem('usuario', data.user.username);
-        }
+        // IMPORTANTE: Siempre guardar el usuario que ingresó en el formulario de login
+        // Este es el usuario que se usará para identificar quién creó los contratos
+        console.log('Guardando usuario en localStorage:', credentials.usuario);
+        localStorage.setItem('usuario', credentials.usuario);
 
         this.isAuthenticatedSignal.set(true);
         console.log('Signal actualizado, isAuthenticated:', this.isAuthenticatedSignal());
         console.log('Token guardado:', localStorage.getItem('token'));
+        console.log('Usuario guardado:', localStorage.getItem('usuario'));
       } else {
         console.warn('Login no exitoso o sin credenciales');
       }

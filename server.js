@@ -3,6 +3,7 @@ const sql = require('mssql');
 const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = 3000;
@@ -12,6 +13,24 @@ app.use(express.json());
 
 // Ruta de la carpeta de plantillas
 const PLANTILLAS_DIR = path.join(__dirname, 'plantillas');
+
+// Configuración de correo con nodemailer
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com', // Cambiar según tu proveedor
+  port: 587,
+  secure: false, // true para 465, false para otros puertos
+  auth: {
+    user: 'tu_correo@gmail.com', // Cambiar por tu correo
+    pass: 'tu_contraseña_app'     // Contraseña de aplicación (no la contraseña normal)
+  }
+});
+
+// Lista de destinatarios para notificaciones de contratos
+const DESTINATARIOS_CONTRATOS = [
+  'destinatario1@ejemplo.com',
+  'destinatario2@ejemplo.com',
+  'destinatario3@ejemplo.com'
+];
 
 // Configuración SQL Server
 const sqlConfig = {
@@ -370,6 +389,171 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// POST /enviar-correo - Enviar notificación de contrato creado
+app.post('/enviar-correo', async (req, res) => {
+  try {
+    console.log('📧 POST /enviar-correo recibido');
+    console.log('📦 Datos del contrato:', JSON.stringify(req.body, null, 2));
+
+    const contrato = req.body;
+
+    // Validar que tengamos datos del contrato
+    if (!contrato) {
+      return res.status(400).json({
+        success: false,
+        mensaje: 'No se proporcionaron datos del contrato'
+      });
+    }
+
+    // Construir el cuerpo del correo en HTML
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #25291C; color: #E6E49F; padding: 20px; text-align: center; }
+          .content { background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+          .field { margin-bottom: 10px; }
+          .label { font-weight: bold; color: #25291C; }
+          .value { color: #555; }
+          .footer { margin-top: 20px; padding: 10px; text-align: center; font-size: 12px; color: #999; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Nuevo Contrato Creado</h1>
+          </div>
+          <div class="content">
+            <h2>Información del Contrato</h2>
+
+            <div class="field">
+              <span class="label">Folio:</span>
+              <span class="value">${contrato.folio || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Sociedad:</span>
+              <span class="value">${contrato.sociedad || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Representada:</span>
+              <span class="value">${contrato.representada || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Arrendador:</span>
+              <span class="value">${contrato.arrendador || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Cédula:</span>
+              <span class="value">${contrato.cedula || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Número de Operador:</span>
+              <span class="value">${contrato.numero_operador || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Número de Unidad:</span>
+              <span class="value">${contrato.numero_unidad || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Tipo de Contrato:</span>
+              <span class="value">${contrato.usuario_creacion || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Marca:</span>
+              <span class="value">${contrato.marca || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Modelo:</span>
+              <span class="value">${contrato.modelo || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Año:</span>
+              <span class="value">${contrato.anio || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Color:</span>
+              <span class="value">${contrato.color || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Transmisión:</span>
+              <span class="value">${contrato.transmision || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Placa Única:</span>
+              <span class="value">${contrato.placa_u || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Placa Comercial:</span>
+              <span class="value">${contrato.placa_c || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Fecha del Contrato:</span>
+              <span class="value">${contrato.fecha_contrato || 'N/A'}</span>
+            </div>
+
+            <div class="field">
+              <span class="label">Fecha de Registro:</span>
+              <span class="value">${new Date().toLocaleString('es-ES')}</span>
+            </div>
+          </div>
+          <div class="footer">
+            <p>Este es un correo automático generado por el sistema de gestión de contratos.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Configurar el correo
+    const mailOptions = {
+      from: `"Sistema de Contratos" <${transporter.options.auth.user}>`,
+      to: DESTINATARIOS_CONTRATOS.join(', '),
+      subject: `Nuevo Contrato - ${contrato.arrendador || 'N/A'} - Unidad ${contrato.numero_unidad || 'N/A'}`,
+      html: htmlContent
+    };
+
+    console.log('📨 Enviando correo a:', DESTINATARIOS_CONTRATOS);
+
+    // Enviar el correo
+    const info = await transporter.sendMail(mailOptions);
+
+    console.log('✅ Correo enviado:', info.messageId);
+
+    res.json({
+      success: true,
+      mensaje: 'Correo enviado exitosamente',
+      messageId: info.messageId,
+      destinatarios: DESTINATARIOS_CONTRATOS
+    });
+
+  } catch (error) {
+    console.error('❌ Error enviando correo:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al enviar correo',
+      mensaje: error.message
+    });
+  }
+});
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -394,6 +578,7 @@ async function start() {
     console.log(`📋 Endpoints disponibles:`);
     console.log(`   POST   /login - Autenticación`);
     console.log(`   POST   /contrato - Guardar contrato`);
+    console.log(`   POST   /enviar-correo - Enviar notificación de contrato`);
     console.log(`   GET    /plantillas - Listar plantillas`);
     console.log(`   GET    /plantillas/:nombre - Descargar plantilla`);
     console.log(`   POST   /plantillas/upload - Subir plantilla`);

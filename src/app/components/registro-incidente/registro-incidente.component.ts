@@ -5,6 +5,7 @@ import { PdfIncidenteService } from '../../services/pdf-incidente.service';
 import { WordTemplateService } from '../../services/word-template.service';
 import { Incidente } from '../../models/incidente.model';
 import { environment } from '../../../environments/environment';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-registro-incidente',
@@ -28,6 +29,7 @@ export class RegistroIncidenteComponent implements OnInit {
   tipoSeleccionado = signal<string>('');
   activoSeleccionado = signal<boolean>(false);
   mostrarAdvertenciaPlantilla = signal<boolean>(false);
+  usuarioLogueado = signal<string>('');
 
   tiposTransmision: string[] = [
     'MANUAL',
@@ -41,12 +43,17 @@ export class RegistroIncidenteComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private pdfService: PdfIncidenteService,
-    private wordTemplateService: WordTemplateService
+    private wordTemplateService: WordTemplateService,
+    private authService: AuthService
   ) {
     this.formularioIncidente = this.crearFormulario();
   }
 
   ngOnInit(): void {
+    // Obtener el usuario logueado
+    const usuario = this.authService.getUsuario() || 'Sistema';
+    this.usuarioLogueado.set(usuario);
+
     // Cargar plantillas disponibles
     this.cargarPlantillas();
 
@@ -342,11 +349,17 @@ export class RegistroIncidenteComponent implements OnInit {
       datosContrato.usuario_creacion = datosContrato.plantilla || null;
       delete datosContrato.plantilla; // No enviar el campo plantilla, solo usuario_creacion
 
+      // Obtener el usuario que está creando el contrato
+      const usuarioActual = this.authService.getUsuario() || 'Sistema';
+      datosContrato.usuario_modificacion = usuarioActual;
+      datosContrato.fecha_modificacion = new Date().toISOString();
+
       datosContrato.fecha_guardado = new Date().toISOString();
 
       console.log('📤 Guardando contrato:', datosContrato);
       console.log('📊 Campos del formulario:', Object.keys(datosContrato));
       console.log('👤 Usuario creación (plantilla):', datosContrato.usuario_creacion);
+      console.log('👤 Usuario modificación:', datosContrato.usuario_modificacion);
       console.log('📝 JSON a enviar:', JSON.stringify(datosContrato, null, 2));
 
       const response = await fetch(`${environment.apiUrl}/contrato`, {
@@ -370,9 +383,37 @@ export class RegistroIncidenteComponent implements OnInit {
 
       this.respuestaContrato.set(data);
       this.mostrarDialog.set(true);
+
+      // Enviar correo de notificación en segundo plano
+      this.enviarNotificacionContrato(datosContrato);
+
     } catch (error: any) {
       console.error('❌ Error al guardar contrato:', error);
       this.mostrarError(error.message || 'Error al guardar el contrato. Verifique la conexión con el servidor.');
+    }
+  }
+
+  async enviarNotificacionContrato(datosContrato: any): Promise<void> {
+    try {
+      console.log('📧 Enviando notificación de contrato por correo...');
+
+      const response = await fetch(`${environment.apiUrl}/enviar-correo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(datosContrato)
+      });
+
+      if (response.ok) {
+        const resultado = await response.json();
+        console.log('✅ Correo enviado exitosamente:', resultado);
+      } else {
+        console.warn('⚠️ No se pudo enviar el correo de notificación');
+      }
+    } catch (error: any) {
+      console.error('❌ Error al enviar correo de notificación:', error);
+      // No mostramos error al usuario porque el contrato ya se guardó exitosamente
     }
   }
 
