@@ -31,7 +31,7 @@ export class PdfIncidenteService {
     }
   }
 
-  generarReporteIncidente(incidente: Incidente, accion: 'descargar' | 'imprimir' = 'descargar') {
+  generarReporteIncidente(incidente: Incidente, accion: 'descargar' | 'imprimir' | 'abrir' = 'descargar') {
     if (!this.initialized || !this.pdfMake) {
       console.error('pdfMake not initialized yet');
       alert('El generador de PDF aún no está listo. Por favor, intente nuevamente en un momento.');
@@ -65,8 +65,8 @@ export class PdfIncidenteService {
             {
               width: '50%',
               text: [
-                { text: 'Folio: ', bold: true },
-                incidente.folio
+                { text: 'RUC: ', bold: true },
+                incidente.ruc
               ]
             }
           ],
@@ -77,16 +77,13 @@ export class PdfIncidenteService {
             {
               width: '50%',
               text: [
-                { text: 'Registro: ', bold: true },
-                incidente.registro
+                { text: 'Representada: ', bold: true },
+                incidente.representada
               ]
             },
             {
               width: '50%',
-              text: [
-                { text: 'Representada: ', bold: true },
-                incidente.representada
-              ]
+              text: ''
             }
           ],
           margin: [0, 5, 0, 5]
@@ -239,6 +236,8 @@ export class PdfIncidenteService {
 
     if (accion === 'imprimir') {
       pdf.print();
+    } else if (accion === 'abrir') {
+      pdf.open();
     } else {
       const nombreArchivo = `contrato_${new Date().getTime()}.pdf`;
       pdf.download(nombreArchivo);
@@ -271,7 +270,7 @@ export class PdfIncidenteService {
             widths: ['auto', 'auto', '*', 'auto', 'auto', 'auto'],
             body: [
               [
-                { text: 'Folio', style: 'tableHeader' },
+                { text: 'RUC', style: 'tableHeader' },
                 { text: 'Arrendador', style: 'tableHeader' },
                 { text: 'Marca', style: 'tableHeader' },
                 { text: 'Modelo', style: 'tableHeader' },
@@ -279,7 +278,7 @@ export class PdfIncidenteService {
                 { text: 'Placa U', style: 'tableHeader' }
               ],
               ...incidentes.map(inc => [
-                inc.folio,
+                inc.ruc,
                 inc.arrendador,
                 inc.marca,
                 inc.modelo,

@@ -54,9 +54,150 @@ body {
   animation: slideIn 0.4s ease-out;
 }
 
-/* Clase para ocultar elemento en impresión */
+/* Estilos de impresión */
 @media print {
+  /* Ocultar elementos con la clase no-print */
   .no-print {
     display: none !important;
   }
+
+  /* Configuración del body para impresión */
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remover estilos del backdrop del modal pero mantener visible */
+  .modal-backdrop {
+    position: static !important;
+    background: white !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+  }
+
+  /* Remover estilos decorativos del contenedor del modal */
+  .modal-backdrop > div {
+    max-width: 100% !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  /* Área de impresión - simplificar estilos */
+  .document-print-area {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    overflow: visible !important;
+  }
+
+  .document-print-area > div {
+    box-shadow: none !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Contenedor del documento */
+  .printable-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Estilos para docx-preview */
+  .docx-wrapper {
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    background: white !important;
+  }
+
+  .docx-wrapper section.docx {
+    box-shadow: none !important;
+    page-break-after: always;
+    page-break-inside: avoid;
+    margin: 0 auto !important;
+  }
+}
+
+/* Estilos para docx-preview - Vista previa de documentos Word */
+.docx-wrapper {
+  background: white;
+  padding: 30px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.docx-wrapper > section.docx {
+  background: white;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  margin-bottom: 30px;
+  min-height: 1056px; /* Altura de página A4 */
+  width: 816px; /* Ancho de página A4 */
+  margin-left: auto;
+  margin-right: auto;
+  padding: 96px; /* Márgenes de 1 pulgada */
+  box-sizing: border-box;
+}
+
+.docx {
+  color: black;
+  font-family: Calibri, Candara, Segoe, "Segoe UI", Optima, Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+}
+
+.docx table {
+  border-collapse: collapse;
+}
+
+.docx table td,
+.docx table th {
+  border: 1px solid black;
+  padding: 5px;
+  vertical-align: top;
+}
+
+.docx p {
+  margin: 0;
+  padding: 0;
+  min-height: 1em;
+}
+
+.docx span {
+  white-space: pre-wrap;
+}
+
+.docx a {
+  color: #0563C1;
+  text-decoration: underline;
+}
+
+.docx strong, .docx b {
+  font-weight: bold;
+}
+
+.docx em, .docx i {
+  font-style: italic;
+}
+
+.docx u {
+  text-decoration: underline;
+}
+
+.docx s, .docx strike {
+  text-decoration: line-through;
+}
+
+.docx sup {
+  vertical-align: super;
+  font-size: smaller;
+}
+
+.docx sub {
+  vertical-align: sub;
+  font-size: smaller;
 }

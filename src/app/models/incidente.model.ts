@@ -1,8 +1,7 @@
 export interface Incidente {
   id?: string;
   sociedad: string;
-  folio: string;
-  registro: string;
+  ruc: string;
   contrato: string;
   fecha_contrato?: string;
   dia?: string;
@@ -25,4 +24,8 @@ export interface Incidente {
   pasajeros: string;
   serchasis: string;  // Serie de Chasis
   sermotor: string;   // Serie de Motor
+  dia_c?: string;     // Día del contrato principal
+  mes_c?: string;     // Mes del contrato principal
+  anio_c?: string;    // Año del contrato principal
+  ncontrato?: string; // Número de contrato principal
 }
