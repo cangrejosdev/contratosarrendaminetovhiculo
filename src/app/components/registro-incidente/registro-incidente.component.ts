@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ViewChild, ElementRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { PdfIncidenteService } from '../../services/pdf-incidente.service';
@@ -6,6 +6,7 @@ import { WordTemplateService } from '../../services/word-template.service';
 import { Incidente } from '../../models/incidente.model';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
+import { renderAsync } from 'docx-preview';
 
 @Component({
   selector: 'app-registro-incidente',
@@ -15,10 +16,14 @@ import { AuthService } from '../../services/auth.service';
   styleUrls: ['./registro-incidente.component.css']
 })
 export class RegistroIncidenteComponent implements OnInit {
+  @ViewChild('docxContainer', { static: false }) docxContainer!: ElementRef<HTMLDivElement>;
+
   formularioIncidente: FormGroup;
   mensajeExito = signal<string>('');
   mensajeError = signal<string>('');
   archivoPlantilla: File | null = null;
+  archivoPlantillaBuffer: ArrayBuffer | null = null; // ArrayBuffer del archivo para permitir múltiples lecturas
+  nombreArchivoPlantilla: string = '';
   contratos: any[] = []; // Nueva propiedad para contratos
   plantillasDisponibles: any[] = []; // Plantillas disponibles
   cargandoPlantillas = signal<boolean>(false);
@@ -30,6 +35,10 @@ export class RegistroIncidenteComponent implements OnInit {
   activoSeleccionado = signal<boolean>(false);
   mostrarAdvertenciaPlantilla = signal<boolean>(false);
   usuarioLogueado = signal<string>('');
+  mostrarVisorDocumento = signal<boolean>(false);
+  blobDocumento = signal<Blob | null>(null);
+  mostrarConfirmacionGuardar = signal<boolean>(false);
+  mostrarSegundaConfirmacion = signal<boolean>(false);
 
   tiposTransmision: string[] = [
     'MANUAL',
@@ -58,13 +67,6 @@ export class RegistroIncidenteComponent implements OnInit {
     this.cargarPlantillas();
 
     // Inicialización del formulario
-    // Sincronizar representante -> representada
-    this.formularioIncidente.get('representante')?.valueChanges.subscribe(valor => {
-      if (valor) {
-        this.formularioIncidente.patchValue({ representada: valor }, { emitEvent: false });
-      }
-    });
-
     // Lógica para desglosar fecha de contrato
     this.formularioIncidente.get('fecha_contrato')?.valueChanges.subscribe(fecha => {
       if (fecha) {
@@ -87,8 +89,7 @@ export class RegistroIncidenteComponent implements OnInit {
   private crearFormulario(): FormGroup {
     return this.fb.group({
       sociedad: ['', Validators.required],
-      folio: ['', Validators.required],
-      registro: ['', Validators.required],
+      ruc: ['', Validators.required],
       representante: ['', Validators.required], // Nuevo campo (antes contrato)
       representada: ['', Validators.required],
       arrendador: ['', Validators.required],
@@ -111,7 +112,12 @@ export class RegistroIncidenteComponent implements OnInit {
       transmision: ['', Validators.required],
       pasajeros: ['', Validators.required],
       ser_chasis: ['', Validators.required],
-      ser_motor: ['', Validators.required]
+      ser_motor: ['', Validators.required],
+      dia_c: [''],
+      mes_c: [''],
+      anio_c: [''],
+      ncontrato: [''],
+      vcontrato: ['']  // Visualización del número de contrato guardado
     });
   }
 
@@ -156,10 +162,16 @@ export class RegistroIncidenteComponent implements OnInit {
   private construirIncidente(): Incidente {
     const form = this.formularioIncidente.value;
 
-    return {
+    console.log('🏗️ ===== CONSTRUYENDO INCIDENTE =====');
+    console.log('🏗️ Valor de dia_c en form:', form.dia_c);
+    console.log('🏗️ Valor de mes_c en form:', form.mes_c);
+    console.log('🏗️ Valor de anio_c en form:', form.anio_c);
+    console.log('🏗️ Valor de ncontrato en form:', form.ncontrato);
+    console.log('🏗️ Tipo de ncontrato:', typeof form.ncontrato);
+
+    const incidente = {
       sociedad: form.sociedad,
-      folio: form.folio,
-      registro: form.registro,
+      ruc: form.ruc,
       contrato: form.representante,
       fecha_contrato: form.fecha_contrato,
       dia: form.dia,
@@ -181,8 +193,17 @@ export class RegistroIncidenteComponent implements OnInit {
       transmision: form.transmision,
       pasajeros: form.pasajeros,
       serchasis: form.ser_chasis,
-      sermotor: form.ser_motor
+      sermotor: form.ser_motor,
+      dia_c: form.dia_c,
+      mes_c: form.mes_c,
+      anio_c: form.anio_c,
+      ncontrato: form.ncontrato
     };
+
+    console.log('🏗️ Incidente construido - ncontrato:', incidente.ncontrato);
+    console.log('🏗️ =====================================');
+
+    return incidente;
   }
 
   private marcarCamposInvalidos(): void {
@@ -211,20 +232,30 @@ export class RegistroIncidenteComponent implements OnInit {
   }
 
   // Métodos para trabajar con plantillas Word
-  seleccionarPlantilla(event: Event): void {
+  async seleccionarPlantilla(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
       this.archivoPlantilla = input.files[0];
-      const nombreArchivo = this.archivoPlantilla.name;
+      this.nombreArchivoPlantilla = this.archivoPlantilla.name;
 
-      console.log('🔍 Plantilla seleccionada:', nombreArchivo);
+      // Leer el archivo y almacenar el ArrayBuffer para permitir múltiples lecturas
+      try {
+        this.archivoPlantillaBuffer = await this.archivoPlantilla.arrayBuffer();
+        console.log('✅ Archivo cargado en memoria:', this.nombreArchivoPlantilla);
+      } catch (error) {
+        console.error('❌ Error al leer el archivo:', error);
+        this.mostrarError('Error al cargar el archivo de plantilla');
+        return;
+      }
+
+      console.log('🔍 Plantilla seleccionada:', this.nombreArchivoPlantilla);
       console.log('🔍 Tipo del historial:', this.tipoSeleccionado());
 
-      this.mostrarExito(`Plantilla seleccionada: ${nombreArchivo}`);
+      this.mostrarExito(`Plantilla seleccionada: ${this.nombreArchivoPlantilla}`);
 
       // Comparar con el tipo del signal si existe y está activo
       if (this.tipoSeleccionado() && this.activoSeleccionado()) {
-        const plantillaSinExtension = nombreArchivo.replace('.docx', '').replace('.DOCX', '').trim().toLowerCase();
+        const plantillaSinExtension = this.nombreArchivoPlantilla.replace('.docx', '').replace('.DOCX', '').trim().toLowerCase();
         const tipoSinExtension = this.tipoSeleccionado().replace('.docx', '').replace('.DOCX', '').trim().toLowerCase();
 
         console.log('🔍 Plantilla normalizada:', plantillaSinExtension);
@@ -237,6 +268,19 @@ export class RegistroIncidenteComponent implements OnInit {
           this.mostrarAdvertenciaPlantilla.set(true);
         }
       }
+
+      // Si se selecciona ArrendamientoVehiculoAuxiliar y ya hay operador, consultar contrato main
+      const plantillaNormalizada = this.nombreArchivoPlantilla.replace('.docx', '').replace('.DOCX', '').trim().toLowerCase();
+      if (plantillaNormalizada === 'arrendamientovehiculoauxiliar') {
+        const numeroOperador = this.formularioIncidente.get('numero_operador')?.value;
+        if (numeroOperador) {
+          console.log('🔍 ArrendamientoVehiculoAuxiliar seleccionado con operador:', numeroOperador);
+          console.log('🔍 Consultando contrato main automáticamente...');
+          await this.consultarContratoMain(numeroOperador);
+        } else {
+          console.log('ℹ️ ArrendamientoVehiculoAuxiliar seleccionado, pero no hay número de operador aún');
+        }
+      }
     }
   }
 
@@ -247,22 +291,69 @@ export class RegistroIncidenteComponent implements OnInit {
       return;
     }
 
-    if (!this.archivoPlantilla) {
+    if (!this.archivoPlantillaBuffer) {
       this.mostrarError('Por favor seleccione una plantilla Word (.docx)');
       return;
     }
 
     try {
       const incidente = this.construirIncidente();
-      await this.wordTemplateService.rellenarPlantillaWord(
-        this.archivoPlantilla,
+
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📄 DATOS PASADOS A LA PLANTILLA WORD');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📦 Objeto incidente completo:', JSON.stringify(incidente, null, 2));
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📋 CAMPOS INDIVIDUALES:');
+      console.log('  • sociedad:', incidente.sociedad);
+      console.log('  • ruc:', incidente.ruc);
+      console.log('  • contrato:', incidente.contrato);
+      console.log('  • representada:', incidente.representada);
+      console.log('  • arrendador:', incidente.arrendador);
+      console.log('  • numero_unidad:', incidente.numero_unidad);
+      console.log('  • placa_u:', incidente.placa_u);
+      console.log('  • placa_c:', incidente.placa_c);
+      console.log('  • marca:', incidente.marca);
+      console.log('  • modelo:', incidente.modelo);
+      console.log('  • anio:', incidente.anio);
+      console.log('  • color:', incidente.color);
+      console.log('  • transmision:', incidente.transmision);
+      console.log('  • pasajeros:', incidente.pasajeros);
+      console.log('  • serchasis:', incidente.serchasis);
+      console.log('  • sermotor:', incidente.sermotor);
+      console.log('  • dia_c:', incidente.dia_c);
+      console.log('  • mes_c:', incidente.mes_c);
+      console.log('  • anio_c:', incidente.anio_c);
+      console.log('  • ncontrato:', incidente.ncontrato);
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('🚀 Iniciando generación de documento desde plantilla');
+
+      // Generar el documento Word y obtener el Blob usando el ArrayBuffer
+      const blob = await this.wordTemplateService.rellenarPlantillaWordYObtenerBlob(
+        this.archivoPlantillaBuffer,
         incidente,
-        `incidente_${new Date().getTime()}.docx`
+        `contrato_${new Date().getTime()}.docx`
       );
-      this.mostrarExito('Documento Word generado exitosamente');
-    } catch (error) {
-      this.mostrarError('Error al generar el documento. Verifique que la plantilla sea válida.');
-      console.error(error);
+
+      console.log('✅ Blob del documento generado');
+
+      // Establecer el Blob y mostrar el visor
+      this.blobDocumento.set(blob);
+      this.mostrarVisorDocumento.set(true);
+
+      // Esperar a que el DOM se actualice y el ViewChild esté disponible
+      setTimeout(() => {
+        if (this.docxContainer?.nativeElement) {
+          this.renderizarDocumento(blob);
+        } else {
+          console.error('❌ Contenedor no disponible después del timeout');
+        }
+      }, 100);
+
+      this.mostrarExito('Documento generado exitosamente. Vista previa disponible.');
+    } catch (error: any) {
+      console.error('❌ Error completo:', error);
+      this.mostrarError(`Error: ${error.message || 'Error al generar el documento'}`);
     }
   }
 
@@ -275,12 +366,18 @@ export class RegistroIncidenteComponent implements OnInit {
 
     try {
       const incidente = this.construirIncidente();
-      await this.wordTemplateService.rellenarPlantillaDesdeAssets(
+
+      // Generar el documento Word y convertir a PDF
+      const pdfUrl = await this.wordTemplateService.rellenarPlantillaDesdeAssetsYConvertirAPdf(
         'templates/plantilla-incidente.docx',
         incidente,
-        `incidente_${new Date().getTime()}.docx`
+        `contrato_${new Date().getTime()}.docx`
       );
-      this.mostrarExito('Documento Word generado exitosamente');
+
+      // Abrir el PDF en una nueva pestaña
+      window.open(pdfUrl, '_blank');
+
+      this.mostrarExito('Documento Word descargado y PDF abierto para visualización');
     } catch (error) {
       this.mostrarError('Error al cargar la plantilla. Verifique que existe en assets/templates/');
       console.error(error);
@@ -294,7 +391,7 @@ export class RegistroIncidenteComponent implements OnInit {
       return;
     }
 
-    if (!this.archivoPlantilla) {
+    if (!this.archivoPlantillaBuffer) {
       this.mostrarError('Por favor seleccione una plantilla Word (.docx)');
       return;
     }
@@ -303,32 +400,51 @@ export class RegistroIncidenteComponent implements OnInit {
       const incidente = this.construirIncidente();
       const timestamp = new Date().getTime();
 
-      // Generar Word
-      await this.wordTemplateService.rellenarPlantillaWord(
-        this.archivoPlantilla,
+      // Generar el documento Word y convertir a PDF usando el ArrayBuffer
+      const pdfUrl = await this.wordTemplateService.rellenarPlantillaWordYConvertirAPdf(
+        this.archivoPlantillaBuffer,
         incidente,
         `contrato_${timestamp}.docx`
       );
 
-      // Pequeño delay para que no se descarguen exactamente al mismo tiempo
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Abrir el PDF en una nueva pestaña
+      window.open(pdfUrl, '_blank');
 
-      // Generar PDF
-      this.pdfService.generarReporteIncidente(incidente, 'descargar');
-
-      this.mostrarExito('Documentos Word y PDF generados exitosamente');
+      this.mostrarExito('Documento Word descargado y PDF abierto para visualización');
     } catch (error) {
       this.mostrarError('Error al generar los documentos. Verifique que la plantilla sea válida.');
       console.error(error);
     }
   }
 
-  async guardarContrato(): Promise<void> {
+  guardarContrato(): void {
     if (!this.formularioIncidente.valid) {
       this.marcarCamposInvalidos();
       this.mostrarError('Por favor complete todos los campos requeridos');
       return;
     }
+
+    // Mostrar diálogo de confirmación
+    this.mostrarConfirmacionGuardar.set(true);
+  }
+
+  cancelarGuardarContrato(): void {
+    this.mostrarConfirmacionGuardar.set(false);
+  }
+
+  async confirmarGuardarContrato(): Promise<void> {
+    // Cerrar el primer diálogo y mostrar el segundo
+    this.mostrarConfirmacionGuardar.set(false);
+    this.mostrarSegundaConfirmacion.set(true);
+  }
+
+  cancelarSegundaConfirmacion(): void {
+    this.mostrarSegundaConfirmacion.set(false);
+  }
+
+  async confirmarSegundaGuardar(): Promise<void> {
+    // Cerrar el segundo diálogo de confirmación
+    this.mostrarSegundaConfirmacion.set(false);
 
     try {
       // Obtener valores del formulario y convertir todo a string
@@ -348,6 +464,20 @@ export class RegistroIncidenteComponent implements OnInit {
       // Guardar el valor de plantilla en usuario_creacion y eliminar campo plantilla
       datosContrato.usuario_creacion = datosContrato.plantilla || null;
       delete datosContrato.plantilla; // No enviar el campo plantilla, solo usuario_creacion
+
+      // Eliminar campos que son solo para la plantilla Word y no deben guardarse en el backend
+      delete datosContrato.dia_c;
+      delete datosContrato.mes_c;
+      delete datosContrato.anio_c;
+      delete datosContrato.ncontrato;
+      delete datosContrato.vcontrato;  // Campo de visualización, no se envía al backend
+
+      // El backend espera folio y registro, pero ahora usamos ruc
+      // Mapear ruc a folio y registro, luego eliminar ruc
+      const valorRuc = datosContrato.ruc || '';
+      datosContrato.folio = valorRuc;
+      datosContrato.registro = valorRuc;
+      delete datosContrato.ruc; // No enviar el campo ruc al backend
 
       // Obtener el usuario que está creando el contrato
       const usuarioActual = this.authService.getUsuario() || 'Sistema';
@@ -380,6 +510,29 @@ export class RegistroIncidenteComponent implements OnInit {
 
       // El API devuelve { data: [...] }
       const data = resultado.data?.[0] || resultado;
+
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('✅ CONTRATO GUARDADO EXITOSAMENTE');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📦 Respuesta completa del servidor:', JSON.stringify(data, null, 2));
+      console.log('📦 Todas las propiedades:', Object.keys(data));
+
+      // Si el servidor devuelve numero_contrato, asignarlo al campo ncontrato y vcontrato del formulario
+      if (data.numero_contrato) {
+        console.log('📝 numero_contrato recibido:', data.numero_contrato);
+        console.log('📝 Asignando a ncontrato y vcontrato en el formulario...');
+
+        this.formularioIncidente.patchValue({
+          ncontrato: data.numero_contrato,
+          vcontrato: data.numero_contrato
+        });
+
+        console.log('✅ ncontrato actualizado en formulario:', this.formularioIncidente.get('ncontrato')?.value);
+        console.log('✅ vcontrato actualizado en formulario:', this.formularioIncidente.get('vcontrato')?.value);
+      } else {
+        console.log('⚠️ No se recibió numero_contrato en la respuesta');
+      }
+      console.log('═══════════════════════════════════════════════════════');
 
       this.respuestaContrato.set(data);
       this.mostrarDialog.set(true);
@@ -420,6 +573,238 @@ export class RegistroIncidenteComponent implements OnInit {
   cerrarDialog(): void {
     this.mostrarDialog.set(false);
     this.respuestaContrato.set(null);
+  }
+
+  cerrarVisorDocumento(): void {
+    this.mostrarVisorDocumento.set(false);
+    this.blobDocumento.set(null);
+  }
+
+  imprimirDocumento(): void {
+    if (!this.docxContainer?.nativeElement) {
+      console.error('❌ No hay contenido para imprimir');
+      return;
+    }
+
+    // Obtener el contenido HTML del documento renderizado
+    const contenidoDocumento = this.docxContainer.nativeElement.innerHTML;
+
+    // Crear una nueva ventana para imprimir
+    const ventanaImpresion = window.open('', '_blank', 'width=800,height=600');
+
+    if (!ventanaImpresion) {
+      console.error('❌ No se pudo abrir la ventana de impresión');
+      this.mostrarError('Por favor permite las ventanas emergentes para imprimir');
+      return;
+    }
+
+    // Escribir el contenido en la nueva ventana
+    ventanaImpresion.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Imprimir Documento</title>
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+            font-family: Calibri, Candara, Segoe, "Segoe UI", Optima, Arial, sans-serif;
+          }
+
+          .docx-wrapper {
+            background: white;
+            padding: 0;
+          }
+
+          .docx-wrapper section.docx {
+            background: white;
+            margin: 0 auto;
+            padding: 96px;
+            min-height: 1056px;
+            width: 816px;
+            page-break-after: always;
+          }
+
+          @media print {
+            body {
+              margin: 0;
+              padding: 0;
+            }
+
+            .docx-wrapper section.docx {
+              page-break-after: always;
+              page-break-inside: avoid;
+            }
+          }
+
+          .docx {
+            color: black;
+            font-family: Calibri, Candara, Segoe, "Segoe UI", Optima, Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+          }
+
+          .docx table {
+            border-collapse: collapse;
+          }
+
+          .docx table td,
+          .docx table th {
+            border: 1px solid black;
+            padding: 5px;
+            vertical-align: top;
+          }
+
+          .docx p {
+            margin: 0;
+            padding: 0;
+            min-height: 1em;
+          }
+
+          .docx span {
+            white-space: pre-wrap;
+          }
+        </style>
+      </head>
+      <body>
+        ${contenidoDocumento}
+      </body>
+      </html>
+    `);
+
+    ventanaImpresion.document.close();
+
+    // Esperar a que se cargue el contenido y luego imprimir
+    ventanaImpresion.onload = () => {
+      setTimeout(() => {
+        ventanaImpresion.print();
+        ventanaImpresion.close();
+      }, 250);
+    };
+  }
+
+  /**
+   * Renderiza el documento DOCX usando docx-preview
+   */
+  private async renderizarDocumento(blob: Blob): Promise<void> {
+    try {
+      if (!this.docxContainer?.nativeElement) {
+        console.error('❌ Contenedor no disponible para renderizar documento');
+        return;
+      }
+
+      console.log('📄 Renderizando documento con docx-preview...');
+
+      // Limpiar contenedor antes de renderizar
+      this.docxContainer.nativeElement.innerHTML = '';
+
+      // Renderizar el documento usando docx-preview
+      await renderAsync(blob, this.docxContainer.nativeElement, undefined, {
+        className: 'docx-wrapper',
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        ignoreFonts: false,
+        breakPages: true,
+        ignoreLastRenderedPageBreak: true,
+        experimental: false,
+        trimXmlDeclaration: true,
+        useBase64URL: false,
+        renderChanges: false,
+        renderHeaders: true,
+        renderFooters: true,
+        renderFootnotes: true,
+        renderEndnotes: true,
+        debug: false
+      });
+
+      console.log('✅ Documento renderizado exitosamente con formato preservado');
+    } catch (error) {
+      console.error('❌ Error al renderizar documento:', error);
+      this.mostrarError('Error al mostrar la vista previa del documento');
+    }
+  }
+
+  async consultarContratoMain(numeroOperador: string): Promise<void> {
+    try {
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('🔍 CONSULTANDO CONTRATO MAIN');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📞 Número de operador:', numeroOperador);
+
+      const url = `${environment.apiUrl}/buscar-contrato-main/${numeroOperador}`;
+      console.log('🌐 URL completa:', url);
+      console.log('🌐 Endpoint:', '/buscar-contrato-main/' + numeroOperador);
+
+      const response = await fetch(url);
+      console.log('📡 Response status:', response.status);
+
+      if (!response.ok) {
+        console.error('❌ ERROR en response contrato main');
+        console.error('❌ Status:', response.status, response.statusText);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📊 DATOS RECIBIDOS DEL ENDPOINT');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📦 Data completa:', JSON.stringify(data, null, 2));
+      console.log('📦 Tipo de data:', typeof data);
+      console.log('📦 Es array?:', Array.isArray(data));
+      console.log('📦 Cantidad de registros:', Array.isArray(data) ? data.length : 'No es array');
+
+      if (data && data.length > 0) {
+        const contratoMain = data[0];
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('📋 PRIMER REGISTRO DEL CONTRATO MAIN');
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('📋 Registro completo:', JSON.stringify(contratoMain, null, 2));
+        console.log('📋 Todas las propiedades:', Object.keys(contratoMain));
+
+        // Extraer los datos del contrato principal
+        const dia_c = contratoMain.dia_c || '';
+        const mes_c = contratoMain.mes_c || '';
+        const anio_c = contratoMain.anio_c || '';
+        const ncontrato = contratoMain.ncontrato || '';
+
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('🎯 CAMPOS EXTRAÍDOS PARA LA PLANTILLA');
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('  ✓ dia_c:', dia_c, '(tipo:', typeof dia_c + ')');
+        console.log('  ✓ mes_c:', mes_c, '(tipo:', typeof mes_c + ')');
+        console.log('  ✓ anio_c:', anio_c, '(tipo:', typeof anio_c + ')');
+        console.log('  ✓ ncontrato:', ncontrato, '(tipo:', typeof ncontrato + ')');
+
+        // Actualizar el formulario con estos datos
+        this.formularioIncidente.patchValue({
+          dia_c: dia_c,
+          mes_c: mes_c,
+          anio_c: anio_c,
+          ncontrato: ncontrato
+        });
+
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('✅ DATOS ACTUALIZADOS EN EL FORMULARIO');
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('📝 Valores actuales en el formulario:');
+        console.log('  - dia_c:', this.formularioIncidente.get('dia_c')?.value);
+        console.log('  - mes_c:', this.formularioIncidente.get('mes_c')?.value);
+        console.log('  - anio_c:', this.formularioIncidente.get('anio_c')?.value);
+        console.log('  - ncontrato:', this.formularioIncidente.get('ncontrato')?.value);
+        console.log('═══════════════════════════════════════════════════════');
+      } else {
+        console.log('⚠️ No se encontró contrato principal para el operador');
+        console.log('⚠️ Data recibida está vacía o no es un array con elementos');
+      }
+    } catch (error: any) {
+      console.error('═══════════════════════════════════════════════════════');
+      console.error('❌ ERROR AL CONSULTAR CONTRATO MAIN');
+      console.error('═══════════════════════════════════════════════════════');
+      console.error('❌ Error completo:', error);
+      console.error('❌ Mensaje:', error.message);
+      console.error('═══════════════════════════════════════════════════════');
+    }
   }
 
   async consultarHistorial(): Promise<void> {
@@ -517,12 +902,26 @@ export class RegistroIncidenteComponent implements OnInit {
         console.log('✅ La plantilla es diferente al tipo anterior');
       }
     }
+
+    // Si se selecciona ArrendamientoVehiculoAuxiliar, consultar el contrato main
+    const plantillaNormalizada = plantillaSeleccionada.replace('.docx', '').replace('.DOCX', '').trim().toLowerCase();
+    if (plantillaNormalizada === 'arrendamientovehiculoauxiliar') {
+      const numeroOperador = this.formularioIncidente.get('numero_operador')?.value;
+      if (numeroOperador) {
+        console.log('🔍 ArrendamientoVehiculoAuxiliar seleccionado, consultando contrato main...');
+        this.consultarContratoMain(numeroOperador);
+      } else {
+        console.log('⚠️ No hay número de operador para consultar contrato main');
+      }
+    }
   }
 
   cerrarAdvertenciaPlantilla(): void {
     this.mostrarAdvertenciaPlantilla.set(false);
-    // Limpiar el input file
+    // Limpiar el input file y el buffer
     this.archivoPlantilla = null;
+    this.archivoPlantillaBuffer = null;
+    this.nombreArchivoPlantilla = '';
     // Resetear el valor del input file en el formulario
     const inputFile = document.querySelector('input[type="file"]') as HTMLInputElement;
     if (inputFile) {
@@ -560,6 +959,14 @@ export class RegistroIncidenteComponent implements OnInit {
       return;
     }
 
+    // Asignar numero_operador a idopNetSuite
+    this.formularioIncidente.patchValue({
+      idopNetSuite: numeroOperador
+    });
+    // Marcar el campo como touched
+    this.formularioIncidente.get('idopNetSuite')?.markAsTouched();
+    console.log('📝 idopNetSuite asignado:', numeroOperador);
+
     try {
       console.log('Consultando operador:', numeroOperador);
       const response = await fetch(`${environment.apiUrl}/ver-operador-contrato/${numeroOperador}`);
@@ -569,10 +976,15 @@ export class RegistroIncidenteComponent implements OnInit {
       }
 
       const data = await response.json();
-      console.log('Datos operador recibidos:', data);
+      console.log('📊 ===== DATOS COMPLETOS DEL OPERADOR =====');
+      console.log('📊 Datos operador recibidos:', data);
+      console.log('📊 Tipo de data:', typeof data);
+      console.log('📊 Es array?:', Array.isArray(data));
 
       if (data && data.length > 0) {
         const operador = data[0];
+        console.log('📊 Primer operador:', operador);
+        console.log('📊 Todas las propiedades del operador:', Object.keys(operador));
 
         // Extraer campos del operador
         const apellido = operador.Apellido || '';
@@ -580,18 +992,45 @@ export class RegistroIncidenteComponent implements OnInit {
         const nombreCompleto = `${apellido} ${nombre}`.trim();
         const cedula = operador.Cedula || operador.cedula || '';
         const unidad = operador.Unidad || operador.unidad || '';
+        const ruc = operador.ruc || operador.RUC || '';
+        const representada = operador.representada || operador.Representada || operador.REPRESENTADA || '';
+
+        console.log('📊 ===== CAMPOS EXTRAÍDOS =====');
+        console.log('📊 Apellido:', apellido);
+        console.log('📊 Nombre:', nombre);
+        console.log('📊 Nombre Completo:', nombreCompleto);
+        console.log('📊 Cédula:', cedula);
+        console.log('📊 Unidad:', unidad);
+        console.log('📊 RUC extraído:', ruc);
+        console.log('📊 RUC directo operador.ruc:', operador.ruc);
+        console.log('📊 RUC directo operador.RUC:', operador.RUC);
+        console.log('📊 Representada extraída:', representada);
+        console.log('📊 Representada directo operador.representada:', operador.representada);
+        console.log('📊 Representada directo operador.Representada:', operador.Representada);
+        console.log('📊 Representada directo operador.REPRESENTADA:', operador.REPRESENTADA);
+        console.log('📊 =====================================');
 
         // Llenar formulario con los datos del operador
         this.formularioIncidente.patchValue({
           arrendador: nombreCompleto,
           cedula: cedula,
-          numero_unidad: unidad
+          numero_unidad: unidad,
+          ruc: ruc,
+          representada: representada
         });
+
+        console.log('📊 ===== VALORES EN EL FORMULARIO =====');
+        console.log('📊 Arrendador en formulario:', this.formularioIncidente.get('arrendador')?.value);
+        console.log('📊 Cédula en formulario:', this.formularioIncidente.get('cedula')?.value);
+        console.log('📊 Unidad en formulario:', this.formularioIncidente.get('numero_unidad')?.value);
+        console.log('📊 RUC en formulario:', this.formularioIncidente.get('ruc')?.value);
+        console.log('📊 Representada en formulario:', this.formularioIncidente.get('representada')?.value);
+        console.log('📊 =====================================');
 
         // Marcar campo cédula como touched
         this.formularioIncidente.get('cedula')?.markAsTouched();
 
-        this.mostrarExito(`Datos del operador cargados: ${nombreCompleto} - Cédula: ${cedula}`);
+        this.mostrarExito(`Datos del operador cargados: ${nombreCompleto} - Cédula: ${cedula} - RUC: ${ruc}`);
 
         // Si hay unidad, buscar datos de la unidad automáticamente
         if (unidad) {
@@ -601,6 +1040,21 @@ export class RegistroIncidenteComponent implements OnInit {
 
         // Consultar historial automáticamente después de validar operador
         await this.consultarHistorial();
+
+        // Si la plantilla seleccionada es ArrendamientoVehiculoAuxiliar, consultar contrato main
+        if (this.archivoPlantilla) {
+          const nombrePlantilla = this.archivoPlantilla.name;
+          const plantillaNormalizada = nombrePlantilla.replace('.docx', '').replace('.DOCX', '').trim().toLowerCase();
+          console.log('🔍 Plantilla actual:', nombrePlantilla);
+          console.log('🔍 Plantilla normalizada:', plantillaNormalizada);
+
+          if (plantillaNormalizada === 'arrendamientovehiculoauxiliar') {
+            console.log('🔍 ArrendamientoVehiculoAuxiliar detectado, consultando contrato main para operador:', numeroOperador);
+            await this.consultarContratoMain(numeroOperador);
+          }
+        } else {
+          console.log('ℹ️ No hay plantilla seleccionada aún');
+        }
       }
     } catch (error) {
       console.error('Error al validar operador:', error);
@@ -733,7 +1187,7 @@ export class RegistroIncidenteComponent implements OnInit {
       const sociedades: { [key: string]: string } = {
         'C': 'VIPCO',
         'P': 'VIPINDUSTRIES',
-        'V': 'VIPCOMPNAY',
+        'V': 'VIPCOMPANY',
         'I': 'VIPCARS'
       };
 

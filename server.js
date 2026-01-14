@@ -5,6 +5,11 @@ const fs = require('fs').promises;
 const path = require('path');
 const nodemailer = require('nodemailer');
 
+const multer = require('multer');
+const mammoth = require('mammoth');
+const htmlPdf = require('html-pdf-node');
+
+
 const app = express();
 const PORT = 3000;
 

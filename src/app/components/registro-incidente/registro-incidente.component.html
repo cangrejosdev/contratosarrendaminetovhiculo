@@ -1,4 +1,4 @@
-<div class="min-h-screen px-4 py-8 lg:py-12 bg-[#E3E7D3]">
+<div class="min-h-screen px-4 py-8 lg:py-12 bg-[#E3E7D3] no-print">
   <div class="container max-w-7xl mx-auto">
     <!-- Encabezado Principal -->
     <div class="mb-10 text-center">
@@ -67,25 +67,11 @@
               <select
                 formControlName="tipo_busqueda"
                 class="w-full px-4 py-2.5 border border-[#BDC2BF] rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] outline-none">
-                <option value="">Seleccione un tipo...</option>
-                <option value="Entrevistas">Entrevistas</option>
-                <option value="PTY">PTY</option>
+                <option value="PTY" selected>PTY</option>
               </select>
-            </div>
+            </div> 
 
-            <!-- Cédula -->
-            <div>
-              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
-                Cédula
-              </label>
-              <input
-                type="text"
-                formControlName="cedula"
-                (keydown.enter)="buscarPorCedula($event)"
-                placeholder="Ingrese la cédula y presione Enter"
-                class="w-full px-4 py-2.5 border border-[#BDC2BF] rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
-              <p class="mt-1.5 text-xs text-[#989C94]">Presione Enter para buscar</p>
-            </div>
+
 
             <!-- Número de Operador -->
             <div>
@@ -108,6 +94,20 @@
                   {{ obtenerMensajeError('numero_operador') }}
                 </p>
               }
+            </div>
+
+                        <!-- Cédula -->
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Cédula
+              </label>
+              <input
+                type="text"
+                formControlName="cedula"
+                (keydown.enter)="buscarPorCedula($event)"
+                placeholder="Ingrese la cédula y presione Enter"
+                class="w-full px-4 py-2.5 border border-[#BDC2BF] rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
+              <p class="mt-1.5 text-xs text-[#989C94]">Presione Enter para buscar</p>
             </div>
 
             <!-- ID Operador NetSuite -->
@@ -231,46 +231,24 @@
               }
             </div>
 
-            <!-- Folio -->
+            <!-- RUC -->
             <div>
               <label class="block mb-2 text-sm font-semibold text-[#25291C]">
-                Folio <span class="text-red-500">*</span>
+                RUC <span class="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                formControlName="folio"
-                placeholder="Número de folio"
-                [class.border-red-400]="campoInvalido('folio')"
-                [class.border-[#BDC2BF]]="!campoInvalido('folio')"
+                formControlName="ruc"
+                placeholder="Número de RUC"
+                [class.border-red-400]="campoInvalido('ruc')"
+                [class.border-[#BDC2BF]]="!campoInvalido('ruc')"
                 class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
-              @if (campoInvalido('folio')) {
+              @if (campoInvalido('ruc')) {
                 <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
                   <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                   </svg>
-                  {{ obtenerMensajeError('folio') }}
-                </p>
-              }
-            </div>
-
-            <!-- Registro -->
-            <div>
-              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
-                Registro <span class="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                formControlName="registro"
-                placeholder="Número de registro"
-                [class.border-red-400]="campoInvalido('registro')"
-                [class.border-[#BDC2BF]]="!campoInvalido('registro')"
-                class="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#E6E49F] focus:border-[#E6E49F] transition-all duration-200 bg-white text-[#25291C] placeholder-[#989C94] outline-none">
-              @if (campoInvalido('registro')) {
-                <p class="flex items-center mt-1.5 text-xs text-red-600 font-medium">
-                  <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                  </svg>
-                  {{ obtenerMensajeError('registro') }}
+                  {{ obtenerMensajeError('ruc') }}
                 </p>
               }
             </div>
@@ -603,7 +581,19 @@
                 class="block w-full text-sm text-[#25291C] cursor-pointer file:mr-4 file:py-2.5 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#E6E49F] file:text-[#25291C] hover:file:bg-[#E6E49F]/80 file:transition-all file:duration-200 file:shadow-sm hover:file:shadow-md">
             </div>
 
-            <div class="p-4 border border-[#BDC2BF]/50 bg-[#E3E7D3]/30 rounded-lg">
+            <div>
+              <label class="block mb-2 text-sm font-semibold text-[#25291C]">
+                Número de Contrato
+              </label>
+              <input
+                type="text"
+                formControlName="vcontrato"
+                readonly
+                class="block w-full px-4 py-2.5 text-sm text-[#25291C] bg-[#F5F5F5] border border-[#BDC2BF]/50 rounded-lg cursor-not-allowed focus:outline-none"
+                placeholder="Se asignará automáticamente al guardar">
+            </div>
+
+            <!-- <div class="p-4 border border-[#BDC2BF]/50 bg-[#E3E7D3]/30 rounded-lg">
               <p class="flex items-center mb-3 font-bold text-[#25291C] text-sm">
                 <svg class="w-5 h-5 mr-2 text-[#25291C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
@@ -612,8 +602,8 @@
               </p>
               <div class="grid grid-cols-2 gap-2 text-xs md:grid-cols-3 lg:grid-cols-4">
                 <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;sociedad&#125;</code>
-                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;folio&#125;</code>
-                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;registro&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;ruc&#125;</code>
+                <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;representante&#125;</code>
                 <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;representada&#125;</code>
                 <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;arrendador&#125;</code>
                 <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;numero_operador&#125;</code>
@@ -629,7 +619,7 @@
                 <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;serchasis&#125;</code>
                 <code class="px-2.5 py-1.5 font-mono text-[#25291C] bg-white border border-[#BDC2BF]/50 rounded-md shadow-sm">&#123;seremotor&#125;</code>
               </div>
-            </div>
+            </div> -->
           </div>
         </div>
 
@@ -651,7 +641,7 @@
             Guardar Contrato
           </button>
 
-          <button type="button" (click)="imprimirPDF()" [disabled]="!formularioIncidente.valid"
+          <!-- <button type="button" (click)="imprimirPDF()" [disabled]="!formularioIncidente.valid"
             class="flex items-center justify-center px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-white border border-[#BDC2BF] rounded-lg hover:bg-[#E3E7D3] disabled:bg-[#BDC2BF]/20 disabled:text-[#989C94] disabled:cursor-not-allowed shadow-sm hover:shadow-md">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
@@ -665,22 +655,15 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
             </svg>
             Descargar PDF
-          </button>
+          </button> -->
 
           <button type="button" (click)="generarDesdePlantillaWord()" [disabled]="!formularioIncidente.valid"
-            class="flex items-center justify-center px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-white border border-[#BDC2BF] rounded-lg hover:bg-[#E3E7D3] disabled:bg-[#BDC2BF]/20 disabled:text-[#989C94] disabled:cursor-not-allowed shadow-sm hover:shadow-md">
+            class="flex items-center justify-center px-5 py-2.5 text-white font-semibold transition-all duration-200 bg-[#25291C] rounded-lg hover:bg-[#25291C]/90 disabled:bg-[#BDC2BF]/40 disabled:text-[#989C94] disabled:cursor-not-allowed shadow-sm hover:shadow-md">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
             </svg>
-            Generar Word
-          </button>
-
-          <button type="button" (click)="generarWordYPdf()" [disabled]="!formularioIncidente.valid"
-            class="flex items-center justify-center px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-[#E6E49F] rounded-lg hover:bg-[#E6E49F]/80 disabled:bg-[#BDC2BF]/40 disabled:text-[#989C94] disabled:cursor-not-allowed shadow-sm hover:shadow-md">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            Generar Word y PDF
+            Generar desde Plantilla (Word + Vista PDF)
           </button>
 
           <button type="button" (click)="consultarHistorial()"
@@ -850,6 +833,162 @@
           <button (click)="cerrarAdvertenciaPlantilla()"
             class="w-full px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-yellow-400 rounded-lg hover:bg-yellow-500 shadow-sm hover:shadow-md">
             Entendido
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal Visor de Documento -->
+  @if (mostrarVisorDocumento()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm modal-backdrop">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-[#BDC2BF]/30 flex flex-col">
+        <!-- Header -->
+        <div class="px-6 py-4 bg-[#25291C] rounded-t-lg flex items-center justify-between no-print">
+          <h3 class="text-lg font-bold text-white flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Vista Previa del Documento
+          </h3>
+          <button (click)="cerrarVisorDocumento()" class="text-white hover:bg-white/20 rounded-full p-2 transition-colors duration-200">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Viewer Container -->
+        <div class="flex-1 overflow-auto p-4 bg-gray-50 document-print-area">
+          <div class="bg-white rounded-lg shadow-sm h-full overflow-auto">
+            <div #docxContainer class="printable-content" style="width:100%; height:75vh; overflow:auto; padding: 20px;"></div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-[#E3E7D3]/30 border-t border-[#BDC2BF]/30 rounded-b-lg flex justify-end gap-3 no-print">
+          <button (click)="imprimirDocumento()"
+            class="flex items-center px-5 py-2.5 text-white font-semibold transition-all duration-200 bg-[#25291C] rounded-lg hover:bg-[#25291C]/80 shadow-sm hover:shadow-md">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+            </svg>
+            Imprimir
+          </button>
+          <button (click)="cerrarVisorDocumento()"
+            class="px-5 py-2.5 text-[#25291C] font-semibold transition-all duration-200 bg-[#E6E49F] rounded-lg hover:bg-[#E6E49F]/80 shadow-sm hover:shadow-md">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal Confirmación Guardar Contrato -->
+  @if (mostrarConfirmacionGuardar()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md border border-[#BDC2BF]/30 overflow-hidden">
+        <!-- Header con icono de advertencia -->
+        <div class="px-6 py-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-t-lg">
+          <div class="flex items-center">
+            <svg class="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <h3 class="text-xl font-bold text-white">Advertencia</h3>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div class="px-6 py-6">
+          <p class="text-lg font-semibold text-[#25291C] mb-3">
+            ¿Está seguro que desea guardar este contrato?
+          </p>
+          <div class="bg-orange-50 border-l-4 border-orange-500 p-4 mb-4 rounded">
+            <div class="flex">
+              <svg class="w-5 h-5 text-orange-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+              </svg>
+              <div class="text-sm text-orange-800">
+                <p class="font-semibold mb-1">Esta acción es irreversible</p>
+                <p>Una vez guardado el contrato, no podrá ser modificado ni eliminado. Asegúrese de que todos los datos sean correctos antes de continuar.</p>
+              </div>
+            </div>
+          </div>
+          <p class="text-sm text-gray-600">
+            Por favor, revise cuidadosamente toda la información antes de proceder.
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg flex justify-end gap-3">
+          <button (click)="cancelarGuardarContrato()"
+            class="px-5 py-2.5 text-gray-700 font-semibold transition-all duration-200 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 shadow-sm hover:shadow-md">
+            Cancelar
+          </button>
+          <button (click)="confirmarGuardarContrato()"
+            class="flex items-center px-5 py-2.5 text-white font-semibold transition-all duration-200 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg hover:from-orange-600 hover:to-red-600 shadow-sm hover:shadow-md">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Sí, Continuar
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal Segunda Confirmación -->
+  @if (mostrarSegundaConfirmacion()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-60 backdrop-blur-md">
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-md border-2 border-red-500 overflow-hidden animate-pulse-slow">
+        <!-- Header con icono de peligro -->
+        <div class="px-6 py-4 bg-gradient-to-r from-red-600 to-red-700 rounded-t-lg">
+          <div class="flex items-center">
+            <svg class="w-10 h-10 text-white mr-3 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <h3 class="text-xl font-bold text-white">Confirmación Final</h3>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div class="px-6 py-6">
+          <p class="text-xl font-bold text-red-600 mb-4 text-center">
+            ¿Está completamente seguro?
+          </p>
+          <div class="bg-red-50 border-2 border-red-500 p-5 mb-4 rounded-lg">
+            <div class="flex">
+              <svg class="w-6 h-6 text-red-600 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+              </svg>
+              <div class="text-sm text-red-900">
+                <p class="font-bold mb-2 text-base">Esta es su última oportunidad para cancelar</p>
+                <p class="mb-2">Una vez confirmado, el contrato será guardado de forma <span class="font-bold underline">permanente e irreversible</span>.</p>
+                <p class="font-semibold">No podrá:</p>
+                <ul class="list-disc list-inside ml-2 mt-1 space-y-1">
+                  <li>Modificar los datos del contrato</li>
+                  <li>Eliminar el registro</li>
+                  <li>Deshacer esta acción</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <p class="text-sm text-center text-gray-700 font-semibold bg-yellow-50 border border-yellow-300 rounded p-3">
+            Si tiene alguna duda, es mejor cancelar y revisar nuevamente.
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-gray-50 border-t-2 border-red-200 rounded-b-lg flex justify-end gap-3">
+          <button (click)="cancelarSegundaConfirmacion()"
+            class="px-6 py-3 text-gray-700 font-bold transition-all duration-200 bg-white border-2 border-gray-400 rounded-lg hover:bg-gray-100 shadow-md hover:shadow-lg">
+            No, Cancelar
+          </button>
+          <button (click)="confirmarSegundaGuardar()"
+            class="flex items-center px-6 py-3 text-white font-bold transition-all duration-200 bg-gradient-to-r from-red-600 to-red-700 rounded-lg hover:from-red-700 hover:to-red-800 shadow-md hover:shadow-lg">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Sí, Guardar Definitivamente
           </button>
         </div>
       </div>

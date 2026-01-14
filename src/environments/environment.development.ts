@@ -1,4 +1,4 @@
 export const environment = {
-  production: true,
-  apiUrl: 'https://logistictodo.com:55089'
+  production: false,
+  apiUrl: 'http://localhost:3000'
 };
